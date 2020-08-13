@@ -10,8 +10,8 @@ enum Color {
 
 struct Tree{
 
-    int key;
-    char string;
+    long key;
+    char string[1024];
     enum Color color;
 
     tree_pointer root, prev, left, right;
@@ -19,44 +19,38 @@ struct Tree{
 };
 
 
-tree_pointer root = NULL;
-
 
 // CLASSIC TREE
-tree_pointer insertTree(tree_pointer T, struct Tree t);
 void printTree(tree_pointer T);
-
-
 
 // RED BLACK TREE
 void leftRotate(tree_pointer T, tree_pointer x);
-void rightRotate(tree_pointer T, tree_pointer x);
+void rightRotate(tree_pointer T, tree_pointer z);
 
-void rbInsert(tree_pointer T, tree_pointer x);
-void rbInsertFixup(tree_pointer T, tree_pointer x);
+void rbInsert(tree_pointer T, tree_pointer z);
+void rbInsertFixup(tree_pointer T, tree_pointer z);
 
 tree_pointer rbDelete(tree_pointer T, tree_pointer z);
 void rbDeleteFixup(tree_pointer T, tree_pointer x);
 
 tree_pointer treeMinimum(tree_pointer x);
-tree_pointer treeMaximum(tree_pointer x);
+
+__unused tree_pointer treeMaximum(tree_pointer x);
 tree_pointer successorNode(tree_pointer x);
 
-tree_pointer treeSearch(tree_pointer x, int k);
+tree_pointer treeSearch(tree_pointer x, long k);
 
-void getStrings();
+// HELPER
+void getBounds(char row[], long *ind1, long *ind2);
+
+
+
+
+
 
 int main() {
-    printf("Hello, World!\n");
-    //return 0;
-
-    /*tree_pointer root = malloc(sizeof(typeof(struct Tree)));
-    root->root = NULL;
-    root->key = 0;
-    root->string = 0;*/
 
     tree_pointer tree = malloc(sizeof(typeof(struct Tree)));
-    tree->color = NULL;
     tree->left = NULL;
     tree->right = NULL;
     tree->prev = NULL;
@@ -65,97 +59,153 @@ int main() {
     for (int i = 10; i > 0; i--){
         tree_pointer x = malloc(sizeof(typeof(struct Tree)));
         x->key = i;
-        x->string = i;
-        x->color = NULL;
         x->left = NULL;
         x->right = NULL;
         x->prev = NULL;
         x->root = NULL;
 
         rbInsert(tree, x);
-    }
+    }   // add some nodes for debug
 
     printf("Inoder Traversal of Created Tree\n");
     printTree(tree->root);
 
-    // while (righe del documento)
-    char string = malloc(1024);
-    scanf("%s", string);
 
-    if (strstr(string, "c") != NULL) {
+    //while (1){
+        char row[1024];
+        gets(row);
+        //scanf("%s", row);
 
-        int ind1, ind2;
-        // piglio i valori
+        if (strstr(row, "c") != NULL) {
 
-        int numRow = ind2-ind1;
+            long ind1 = 0, ind2 = 0;
 
-        char rows[numRow];
-        // get strings in input
+            unsigned long length = strlen(row);
+            char copy[length-1];
 
-        // MODO 1
-        for (int i = 0; i < numRow; i++) {
+            strncpy(copy, row, length - 1);
 
-            int key = ind1+i;
-            tree_pointer node = treeSearch(tree->root, key);
-            node->string = rows[i];
+            getBounds(copy, &ind1, &ind2);
+
+            long numRow = ind2-ind1+1;
+
+            // MODO 1
+            for (int i = 0; i < numRow; i++) {
+
+                //scanf("%s", row);
+                gets(row);
+
+                long key = ind1+i;
+
+                tree_pointer node = treeSearch(tree->root, key);
+
+                if(node != NULL){
+
+                    strcpy(node->string, row);
+
+                } else{
+
+                    tree_pointer x = malloc(sizeof(typeof(struct Tree)));
+                    x->key = key;
+                    strcpy(x->string, row);
+                    x->left = NULL;
+                    x->right = NULL;
+                    x->prev = NULL;
+                    x->root = NULL;
+
+                    rbInsert(tree->root, x);
+                }
+
+
+            }
+
+            // MODO 2
+            /*//scanf("%s", row);
+            gets(row);
+            tree_pointer node = treeSearch(tree->root, ind1);
+            node->string = row;
+
+            for (int i = 0; i < numRow; i++) {
+
+                node = successorNode(node);
+                //scanf("%s", row);
+                gets(row);
+                node->string = row;
+
+            }*/
+
+            gets(row);
+            if(strcmp(row, ".") == 0){
+                printf("command executed\n");
+            }
+
         }
+        else if (strstr(row, "d") != NULL) {
 
-        // MODO 2
-        /*tree_pointer node = treeSearch(tree->root, ind1);
-        node->string = rows[0];
+            long ind1, ind2;
+            getBounds(row, &ind1, &ind2);
 
-        for (int i = 1; i < numRow; i++) {
+            long numRow = ind2-ind1+1;
 
-            node = successorNode(node);
-            node->string = rows[i];
+            for (int i = 0; i < numRow; i++) {
 
-        }*/
+                long key = ind1+i;
+                tree_pointer node = treeSearch(tree->root, key);
 
-    }
-    if (strstr(string, "d") != NULL) {
+                if(node != NULL){
+                    rbDelete(tree->root, node);
+                }
+            }
 
-        int ind1, ind2;
-        // piglio i valori
-
-        int numRow = ind2-ind1;
-
-        for (int i = 0; i < numRow; i++) {
-
-            char rows[numRow];
-            // get strings in input
-
-            int key = ind1+i;
-            tree_pointer node = rbDelete(tree->root, key);
         }
+        else if (strstr(row, "p") != NULL) {
 
-    }
-    if (strstr(string, "p") != NULL) {
+            long ind1, ind2;
+            getBounds(row, &ind1, &ind2);
 
-        int ind1, ind2;
-        // piglio i valori
+            long numRow = ind2-ind1+1;
 
-        int numRow = ind2-ind1;
+            // MODO 1
+            for (int i = 0; i < numRow; i++) {
 
-        // MODO 1
-        for (int i = 0; i < numRow; i++) {
+                long key = ind1+i;
+                tree_pointer node = treeSearch(tree->root, key);
 
-            int key = ind1+i;
-            tree_pointer node = treeSearch(tree, key);
+                if(node != NULL){
+                    printf("%s\n", node->string);
+                }
+            }
+
+
+            // MODO 2
+            /*tree_pointer node = treeSearch(tree, ind1);
             printf("%s", node->string);
+
+            for (int i = 1; i < numRow; i++) {
+
+                node = successorNode(node);
+                printf("%s", node->string);
+            }*/
+
+        }
+        else if (strstr(row, "u") != NULL) {
+
+
+        }
+        else if (strstr(row, "r") != NULL) {
+
+
+        }
+        else if (strstr(row, "q") != NULL) {
+
+            return 0;
+
         }
 
 
-        // MODO 2
-        /*tree_pointer node = treeSearch(tree, ind1);
-        printf("%s", node->string);
-
-        for (int i = 1; i < numRow; i++) {
-
-            node = successorNode(node);
-            printf("%s", node->string);
-        }*/
-
-    }
+        //printf("Inoder Traversal of Created Tree\n");
+        //printTree(tree->root);
+    //}
 
 
     // prendo il comando:
@@ -188,11 +238,16 @@ int main() {
 }
 
 
+
+
+
+
 void printTree(tree_pointer T){
 
     if(T != NULL){
         printTree(T->left);
-        printf("%d\n", T->key);
+        printf("%ld ", T->key);
+        printf("%s\n", T->string);
         printTree(T->right);
     }
 }
@@ -505,7 +560,8 @@ tree_pointer treeMinimum(tree_pointer x){
     }
     return x;
 }
-tree_pointer treeMaximum(tree_pointer x){
+
+__unused tree_pointer treeMaximum(tree_pointer x){
     while (x->right != NULL){
         x = x->right;
     }
@@ -526,7 +582,7 @@ tree_pointer successorNode(tree_pointer x){
     return y;
 }
 
-tree_pointer treeSearch(tree_pointer x, int k){
+tree_pointer treeSearch(tree_pointer x, long k){
     if(x == NULL || k == x->key){
         return x;
     }
@@ -534,5 +590,46 @@ tree_pointer treeSearch(tree_pointer x, int k){
     if(k < x->key){
         return treeSearch(x->left, k);
     } else return treeSearch(x->right, k);
+}
+
+void getBounds(char row[], long *ind1, long *ind2){
+
+    /*char splitChar = ',';
+
+    char *token;
+    token = strtok(row, splitChar);
+
+    while (token != NULL) {
+
+         if(token == ','){
+            ind1 = atoi(token);
+            splitChar = ' ';
+        } else {
+            ind2 = atoi(token);
+        }
+
+        token = strtok(NULL, splitChar);
+    }*/
+
+    long ret;
+
+    for (int i = 0; i < 2; ++i) {
+
+
+        ret = strtol(row, &row, 10);
+        char *ps = row;
+        ps++;
+        row = ps;
+
+        printf("The number(unsigned long integer) is %ld\n", ret);
+
+        if(i == 0) *ind1 = ret;
+        else *ind2 = ret;
+
+    }
+
+
+
+
 }
 
