@@ -18,6 +18,15 @@ struct Tree{
 
 };
 
+struct Node {
+    char command[1024];
+    __unused struct Node* next;
+    struct Node* prev;
+};
+
+struct Node* head;
+struct Node* tail;
+
 
 
 // CLASSIC TREE
@@ -43,6 +52,12 @@ tree_pointer treeSearch(tree_pointer x, long k);
 // HELPER
 void getBounds(char row[], long *ind1, long *ind2);
 
+// DOUBLE LINKED LIST
+struct Node* createNode(char x[]);
+void insertTail(char x[]);
+void comeBackTail();
+void goNextTail();
+
 
 
 
@@ -50,13 +65,16 @@ void getBounds(char row[], long *ind1, long *ind2);
 
 int main() {
 
+    long undo = 0;
+    tree_pointer temp_root = NULL;
+
     tree_pointer tree = malloc(sizeof(typeof(struct Tree)));
     tree->left = NULL;
     tree->right = NULL;
     tree->prev = NULL;
     tree->root = NULL;
 
-    for (int i = 10; i > 0; i--){
+    /*for (int i = 10; i > 0; i--){
         tree_pointer x = malloc(sizeof(typeof(struct Tree)));
         x->key = i;
         x->left = NULL;
@@ -68,15 +86,19 @@ int main() {
     }   // add some nodes for debug
 
     printf("Inoder Traversal of Created Tree\n");
-    printTree(tree->root);
+    printTree(tree->root);*/
 
 
-    //while (1){
+    while (1){
         char row[1024];
         gets(row);
         //scanf("%s", row);
 
+
         if (strstr(row, "c") != NULL) {
+
+            insertTail(row);
+            undo = 0;
 
             long ind1 = 0, ind2 = 0;
 
@@ -113,7 +135,7 @@ int main() {
                     x->prev = NULL;
                     x->root = NULL;
 
-                    rbInsert(tree->root, x);
+                    rbInsert(tree, x);
                 }
 
 
@@ -141,6 +163,9 @@ int main() {
 
         }
         else if (strstr(row, "d") != NULL) {
+
+            insertTail(row);
+            undo = 0;
 
             long ind1, ind2;
             getBounds(row, &ind1, &ind2);
@@ -190,10 +215,34 @@ int main() {
         }
         else if (strstr(row, "u") != NULL) {
 
+            if(undo == 0) temp_root = tree->root;
+
+            long ret = strtol(row, (char **) row, 10);
+
+            undo += ret;
+
+            for (int i = 0; i < ret; ++i) {
+                comeBackTail();
+            }
 
         }
         else if (strstr(row, "r") != NULL) {
 
+            if(undo > 0){
+
+                long ret = strtol(row, (char **) row, 10);
+
+
+                if(undo < ret){
+                    tree->root = temp_root;
+                    temp_root = NULL;
+                }
+
+                for (int i = 0; i < ret; ++i) {
+                    goNextTail();
+                }
+
+            }
 
         }
         else if (strstr(row, "q") != NULL) {
@@ -205,7 +254,7 @@ int main() {
 
         //printf("Inoder Traversal of Created Tree\n");
         //printTree(tree->root);
-    //}
+    }
 
 
     // prendo il comando:
@@ -359,14 +408,15 @@ void rbInsertFixup(tree_pointer T, tree_pointer z){
             if (x == x->prev->left){
                 y = x->prev->right;
 
-                if(y != NULL){
-                    if (y->color == RED){
+                if(y != NULL) {
+                    if (y->color == RED) {
                         x->color = BLACK;
                         y->color = BLACK;
                         x->prev->color = RED;
                         rbInsertFixup(T, x->prev);
                     }
                 }
+
                 else {
                     if (z == x->right){
                         z = x;
@@ -377,15 +427,20 @@ void rbInsertFixup(tree_pointer T, tree_pointer z){
                     x->prev->color = RED;
                     rightRotate(T, x->prev);
                 }
+
             }
             else {
                 y = x->prev->left;
-                if (y->color==RED){
-                    x->color = BLACK;
-                    y->color = BLACK;
-                    x->prev->color = RED;
-                    rbInsertFixup(T, x->prev);
+
+                if(y != NULL) {
+                    if (y->color == RED) {
+                        x->color = BLACK;
+                        y->color = BLACK;
+                        x->prev->color = RED;
+                        rbInsertFixup(T, x->prev);
+                    }
                 }
+
                 else {
                     if (z == x->left){
                         z = x;
@@ -396,6 +451,7 @@ void rbInsertFixup(tree_pointer T, tree_pointer z){
                     x->prev->color = RED;
                     leftRotate(T, x->prev);
                 }
+
             }
         }
     }
@@ -633,3 +689,34 @@ void getBounds(char row[], long *ind1, long *ind2){
 
 }
 
+
+
+// DOUBLE LINKED LIST
+struct Node* createNode(char x[]) {
+    struct Node* newNode= (struct Node*)malloc(sizeof(struct Node));
+    strcpy(newNode->command, x);
+    newNode->prev = NULL;
+    newNode->next = NULL;
+    return newNode;
+}
+void insertTail(char x[]) {
+
+    struct Node* newNode = createNode(x);
+
+    if(head == NULL){
+        head = newNode;
+        tail = newNode;
+        return;
+    }
+
+    tail->next = newNode;
+    newNode->prev = tail;
+    tail = newNode;
+}
+
+void comeBackTail(){
+    tail = tail->prev;
+}
+void goNextTail(){
+    tail = tail->next;
+}
