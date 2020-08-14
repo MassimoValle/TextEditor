@@ -8,20 +8,22 @@ enum Color {
     RED, BLACK
 };
 
+struct Node {
+    char value[1024];
+    __unused struct Node* next;
+    struct Node* prev;
+    struct Node* tail;
+
+};
+
 struct Tree{
 
     long key;
-    char string[1024];
+    struct Node* text;
     enum Color color;
 
     tree_pointer root, prev, left, right;
 
-};
-
-struct Node {
-    char command[1024];
-    __unused struct Node* next;
-    struct Node* prev;
 };
 
 struct Node* head;
@@ -55,8 +57,6 @@ void getBounds(char row[], long *ind1, long *ind2);
 // DOUBLE LINKED LIST
 struct Node* createNode(char x[]);
 void insertTail(char x[]);
-void comeBackTail();
-void goNextTail();
 
 
 
@@ -64,9 +64,6 @@ void goNextTail();
 
 
 int main() {
-
-    long undo = 0;
-    tree_pointer temp_root = NULL;
 
     tree_pointer tree = malloc(sizeof(typeof(struct Tree)));
     tree->left = NULL;
@@ -88,17 +85,20 @@ int main() {
     printf("Inoder Traversal of Created Tree\n");
     printTree(tree->root);*/
 
+    char row[1024];
+    long undo = 0;
+
 
     while (1){
-        char row[1024];
         gets(row);
         //scanf("%s", row);
 
 
         if (strstr(row, "c") != NULL) {
 
-            insertTail(row);
             undo = 0;
+
+            insertTail(row);
 
             long ind1 = 0, ind2 = 0;
 
@@ -123,13 +123,22 @@ int main() {
 
                 if(node != NULL){
 
-                    strcpy(node->string, row);
+                    struct Node* n = createNode(row);
+
+                    node->text->tail->next = n;
+                    n->prev = node->text->tail;
+                    node->text->tail = n;
 
                 } else{
 
                     tree_pointer x = malloc(sizeof(typeof(struct Tree)));
+
                     x->key = key;
-                    strcpy(x->string, row);
+
+                    struct Node* n = createNode(row);
+                    x->text = n;
+                    x->text->tail = n;
+
                     x->left = NULL;
                     x->right = NULL;
                     x->prev = NULL;
@@ -158,14 +167,15 @@ int main() {
 
             gets(row);
             if(strcmp(row, ".") == 0){
-                printf("command executed\n");
+                //printf("command executed\n");
             }
 
         }
         else if (strstr(row, "d") != NULL) {
 
-            insertTail(row);
             undo = 0;
+
+            insertTail(row);
 
             long ind1, ind2;
             getBounds(row, &ind1, &ind2);
@@ -178,7 +188,17 @@ int main() {
                 tree_pointer node = treeSearch(tree->root, key);
 
                 if(node != NULL){
-                    rbDelete(tree->root, node);
+
+                    if(node->text == NULL){
+                        rbDelete(tree->root, node);
+                    } else{
+                        struct Node* n = createNode("");
+                        node->text->tail->next = n;
+                        n->prev = node->text->tail;
+                        node->text->tail = n;
+                    }
+
+
                 }
             }
 
@@ -197,8 +217,8 @@ int main() {
                 tree_pointer node = treeSearch(tree->root, key);
 
                 if(node != NULL){
-                    printf("%s\n", node->string);
-                }
+                    printf("%s\n", node->text->tail->value);
+                } else printf(".\n");
             }
 
 
@@ -215,14 +235,25 @@ int main() {
         }
         else if (strstr(row, "u") != NULL) {
 
-            if(undo == 0) temp_root = tree->root;
-
             long ret = strtol(row, (char **) row, 10);
 
             undo += ret;
 
             for (int i = 0; i < ret; ++i) {
-                comeBackTail();
+                long ind1, ind2;
+
+                getBounds(tail->value, &ind1, &ind2);
+
+                long numRow = ind2-ind1+1;
+
+                for (int j = 0; j < numRow; ++j) {
+
+                    long key = ind1+j;
+                    tree_pointer node = treeSearch(tree->root, key);
+                    node->text->tail = node->text->tail->prev;
+                }
+
+                tail = tail->prev;
             }
 
         }
@@ -232,17 +263,31 @@ int main() {
 
                 long ret = strtol(row, (char **) row, 10);
 
-
-                if(undo < ret){
-                    tree->root = temp_root;
-                    temp_root = NULL;
-                }
-
                 for (int i = 0; i < ret; ++i) {
-                    goNextTail();
+                    long ind1, ind2;
+
+                    getBounds(tail->next->value, &ind1, &ind2);
+
+                    long numRow = ind2-ind1+1;
+
+                    for (int j = 0; j < numRow; ++j) {
+
+                        long key = ind1+j;
+                        tree_pointer node = treeSearch(tree->root, key);
+
+                        if(node->text->tail->next != NULL){
+                            node->text->tail = node->text->tail->next;
+                        }
+                    }
+
+                    tail = tail->next;
                 }
+
+                undo -= ret;
 
             }
+
+
 
         }
         else if (strstr(row, "q") != NULL) {
@@ -296,7 +341,7 @@ void printTree(tree_pointer T){
     if(T != NULL){
         printTree(T->left);
         printf("%ld ", T->key);
-        printf("%s\n", T->string);
+        printf("%s\n", T->text->value);
         printTree(T->right);
     }
 }
@@ -677,7 +722,7 @@ void getBounds(char row[], long *ind1, long *ind2){
         ps++;
         row = ps;
 
-        printf("The number(unsigned long integer) is %ld\n", ret);
+        //printf("The number(unsigned long integer) is %ld\n", ret);
 
         if(i == 0) *ind1 = ret;
         else *ind2 = ret;
@@ -694,7 +739,7 @@ void getBounds(char row[], long *ind1, long *ind2){
 // DOUBLE LINKED LIST
 struct Node* createNode(char x[]) {
     struct Node* newNode= (struct Node*)malloc(sizeof(struct Node));
-    strcpy(newNode->command, x);
+    strcpy(newNode->value, x);
     newNode->prev = NULL;
     newNode->next = NULL;
     return newNode;
@@ -712,11 +757,4 @@ void insertTail(char x[]) {
     tail->next = newNode;
     newNode->prev = tail;
     tail = newNode;
-}
-
-void comeBackTail(){
-    tail = tail->prev;
-}
-void goNextTail(){
-    tail = tail->next;
 }
