@@ -71,6 +71,12 @@ int main() {
     tree->prev = NULL;
     tree->root = NULL;
 
+    tree_pointer removed = malloc(sizeof(typeof(struct Tree)));
+    removed->left = NULL;
+    removed->right = NULL;
+    removed->prev = NULL;
+    removed->root = NULL;
+
     /*for (int i = 10; i > 0; i--){
         tree_pointer x = malloc(sizeof(typeof(struct Tree)));
         x->key = i;
@@ -192,10 +198,12 @@ int main() {
                     if(node->text == NULL){
                         rbDelete(tree->root, node);
                     } else{
-                        struct Node* n = createNode("");
-                        node->text->tail->next = n;
-                        n->prev = node->text->tail;
-                        node->text->tail = n;
+                        rbDelete(tree->root, node);
+
+                        node->prev = NULL;
+                        node->left = NULL;
+                        node->right = NULL;
+                        rbInsert(removed->root, node);
                     }
 
 
@@ -250,7 +258,14 @@ int main() {
 
                     long key = ind1+j;
                     tree_pointer node = treeSearch(tree->root, key);
-                    node->text->tail = node->text->tail->prev;
+
+                    if(node != NULL){
+                        node->text->tail = node->text->tail->prev;
+                    } else{
+                        node = treeSearch(removed->root, key);
+                        rbInsert(tree->root, node);
+                        rbDelete(removed->root, node);
+                    }
                 }
 
                 tail = tail->prev;
