@@ -58,30 +58,9 @@ struct TreeNode* createTreeNode(long key, struct HistoryNode* text);
 struct HistoryNode* createNode(char x[]);
 void addInHistory(char *x);
 
-/*
-void change(int* x){
-    *x = 5;
-}
-
-void change2(tree_pointer* y){
-    printf("%ld\n", (*y)->key);
-    (*y)->key = 10;
-}*/
 
 
 int main() {
-
-    /*int x = 0;
-    change(&x);
-    printf("%d\n", x);
-
-    tree_pointer y = malloc(sizeof(struct TreeNode));
-    y->key = 5;
-    change2(&y);
-    printf("%ld\n", y->key);*/
-
-
-
 
     tree_pointer root;              // main tree to show
     tree_pointer root_removed;      // tree with removed nodes
@@ -94,7 +73,8 @@ int main() {
     char row[1024];
     long undo = 0;                  // used to know how many undo I've made
 
-    gets(row);
+    fgets(row, 1024, stdin);
+    strtok(row, "\n");
 
     while (strstr(row, "q") == NULL){
 
@@ -118,7 +98,8 @@ int main() {
             // MODO 1
             for (int i = 0; i < numRow; i++) {
 
-                gets(row);
+                fgets(row, 1024, stdin);
+                strtok(row, "\n");
 
                 long key = ind1+i;
 
@@ -153,7 +134,8 @@ int main() {
             }
 
             // MODO 2
-            /*gets(row);
+            /*fgets(row, 1024, stdin);
+            strtok(row, "\n");
             tree_pointer node = treeSearch(root, ind1);
 
             for (int i = 1; i < numRow; i++) {
@@ -184,11 +166,13 @@ int main() {
                 }
 
                 node = treeSuccessor(node);
-                gets(row);
+                fgets(row, 1024, stdin);
+                strtok(row, "\n");
 
             }*/
 
-            gets(row);
+            fgets(row, 1024, stdin);
+            strtok(row, "\n");
 
             if(strcmp(row, ".") != 0) {
                 printf("Something went wrong\n");
@@ -371,7 +355,8 @@ int main() {
         }
 
 
-        gets(row);
+        fgets(row, 1024, stdin);
+        strtok(row, "\n");
 
     }
 
