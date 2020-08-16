@@ -52,6 +52,7 @@ tree_pointer treeSearch(tree_pointer x, long k);
 
 // HELPER
 void getBounds(char row[], long *ind1, long *ind2);
+struct TreeNode* createTreeNode(long key, struct HistoryNode* text);
 
 // DOUBLE LINKED LIST
 struct HistoryNode* createNode(char x[]);
@@ -214,12 +215,18 @@ int main() {
                     if(node->text == NULL){
                         rbDelete(&root, node);
                     } else{
-                        rbDelete(&root, node);
 
-                        node->prev = nil;
-                        node->left = nil;
-                        node->right = nil;
-                        rbInsert(&root_removed, node);
+                        /*tree_pointer add = malloc(sizeof(typeof(struct TreeNode)));
+                        add->key = node->key;
+                        add->text = node->text;
+                        add->prev = nil;
+                        add->left = nil;
+                        add->right = nil;*/
+
+                        tree_pointer add = createTreeNode(node->key, node->text);
+
+                        rbDelete(&root, node);
+                        rbInsert(&root_removed, add);
                     }
 
 
@@ -284,12 +291,18 @@ int main() {
                         node = treeSearch(root_removed, key);
 
                         if(node != nil){
-                            rbDelete(&root_removed, node);
 
-                            node->prev = nil;
-                            node->left = nil;
-                            node->right = nil;
-                            rbInsert(&root, node);
+                            /*tree_pointer add = malloc(sizeof(typeof(struct TreeNode)));
+                            add->key = node->key;
+                            add->text = node->text;
+                            add->prev = nil;
+                            add->left = nil;
+                            add->right = nil;*/
+
+                            tree_pointer add = createTreeNode(node->key, node->text);
+
+                            rbDelete(&root_removed, node);
+                            rbInsert(&root, add);
                         }
 
                     }
@@ -319,12 +332,18 @@ int main() {
                         tree_pointer node = treeSearch(root, key);
 
                         if(tail->next->value[3] == 'd'){
-                            rbDelete(&root, node);
 
-                            node->prev = nil;
-                            node->left = nil;
-                            node->right = nil;
-                            rbInsert(&root_removed, node);
+                            /*tree_pointer add = malloc(sizeof(typeof(struct TreeNode)));
+                            add->key = node->key;
+                            add->text = node->text;
+                            add->prev = nil;
+                            add->left = nil;
+                            add->right = nil;*/
+
+                            tree_pointer add = createTreeNode(node->key, node->text);
+
+                            rbDelete(&root, node);
+                            rbInsert(&root_removed, add);
                         }
                         else if(node->text->tail->next != NULL){
                             node->text->tail = node->text->tail->next;
@@ -509,6 +528,7 @@ tree_pointer rbDelete(tree_pointer* root, tree_pointer z){
 
     if(y != z){
         z->key = y->key;
+        z->text = y->text;
     }
 
     if(y->color == BLACK){
@@ -650,6 +670,16 @@ void getBounds(char row[], long *ind1, long *ind2){
 
 
 
+}
+struct TreeNode* createTreeNode(long key, struct HistoryNode* text){
+    tree_pointer add = malloc(sizeof(typeof(struct TreeNode)));
+    add->key = key;
+    add->text = text;
+    add->prev = nil;
+    add->left = nil;
+    add->right = nil;
+
+    return add;
 }
 
 // DOUBLE LINKED LIST
