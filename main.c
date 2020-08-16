@@ -2,33 +2,36 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define ROW_LEN 1024
+
 typedef struct TreeNode* tree_pointer;
+typedef struct HistoryNode* history_pointer;
 
 enum Color {
     RED, BLACK
 };
 
 struct HistoryNode {
-    char value[1024];
-    struct HistoryNode* next;
-    struct HistoryNode* prev;
-    struct HistoryNode* tail;
+    char value[ROW_LEN];
+    history_pointer next;
+    history_pointer prev;
+    history_pointer tail;
 
-}; // used for commands history
+};  // used for commands history
 
 struct TreeNode{
 
     long key;
-    struct HistoryNode* text;
+    history_pointer text;
     enum Color color;
 
     tree_pointer prev, left, right;
 
-};  // single node of the tree
+};      // single node of the tree
 
-struct HistoryNode* tail;
 
 tree_pointer nil;
+history_pointer tail;
 
 
 
@@ -51,11 +54,12 @@ tree_pointer treeSearch(tree_pointer* x, long k);
 
 // HELPER
 void getBounds(char row[], long *ind1, long *ind2);
-struct TreeNode* createTreeNode(long key, struct HistoryNode* text);
+tree_pointer createTreeNode(long key, history_pointer text);
 
 // DOUBLE LINKED LIST
-struct HistoryNode* createNode(char x[]);
-void addInHistory(char *x);
+history_pointer createHistoryNode(char *x);
+void addInHistory(char row[]);
+
 
 
 
@@ -69,10 +73,11 @@ int main() {
     root_removed = nil;
 
 
-    char row[1024];
+    //char* row = malloc(sizeof(char) * ROW_LEN);
+    char* row = calloc(sizeof(char), ROW_LEN);
     long undo = 0;                  // used to know how many undo I've made
 
-    fgets(row, 1024, stdin);
+    fgets(row, ROW_LEN, stdin);     // fgets gets '\n' at the end of the string
     strtok(row, "\n");
 
     while (strstr(row, "q") == NULL){
@@ -92,7 +97,7 @@ int main() {
             // MODO 1
             for (int i = 0; i < numRow; i++) {
 
-                fgets(row, 1024, stdin);
+                fgets(row, ROW_LEN, stdin);
                 strtok(row, "\n");
 
                 long key = ind1+i;
@@ -101,7 +106,7 @@ int main() {
 
                 if(node != nil){
 
-                    struct HistoryNode* n = createNode(row);
+                    history_pointer n = createHistoryNode(row);
 
                     node->text->tail->next = n;
                     n->prev = node->text->tail;
@@ -113,7 +118,7 @@ int main() {
 
                     x->key = key;
 
-                    struct HistoryNode* n = createNode(row);
+                    history_pointer n = createHistoryNode(row);
                     x->text = n;
                     x->text->tail = n;
 
@@ -128,7 +133,7 @@ int main() {
             }
 
             // MODO 2
-            /*fgets(row, 1024, stdin);
+            /*fgets(row, ROW_LEN, stdin);
             strtok(row, "\n");
             tree_pointer node = treeSearch(root, ind1);
 
@@ -136,7 +141,7 @@ int main() {
 
                 if(node != nil){
 
-                    struct HistoryNode* n = createNode(row);
+                    struct history_pointer n = createNode(row);
 
                     node->text->tail->next = n;
                     n->prev = node->text->tail;
@@ -148,7 +153,7 @@ int main() {
 
                     x->key = ind1+i-1;
 
-                    struct HistoryNode* n = createNode(row);
+                    struct history_pointer n = createHistoryNode(row);
                     x->text = n;
                     x->text->tail = n;
 
@@ -160,12 +165,12 @@ int main() {
                 }
 
                 node = treeSuccessor(node);
-                fgets(row, 1024, stdin);
+                fgets(row, ROW_LEN, stdin);
                 strtok(row, "\n");
 
             }*/
 
-            fgets(row, 1024, stdin);
+            fgets(row, ROW_LEN, stdin);
             strtok(row, "\n");
 
             if(strcmp(row, ".") != 0) {
@@ -192,6 +197,7 @@ int main() {
 
                     if(node->text == NULL){
                         rbDelete(&root, &node);
+                        free(node);
                     } else{
 
                         /*tree_pointer add = malloc(sizeof(typeof(struct TreeNode)));
@@ -349,14 +355,19 @@ int main() {
         }
 
 
-        fgets(row, 1024, stdin);
+        fgets(row, ROW_LEN, stdin);
         strtok(row, "\n");
 
     }
 
+    /*free(root);
+    free(root_removed);
+    free(nil); //exc
+    free(row);
+    free(tail);*/
+
     return 0;
 }
-
 
 
 
@@ -435,6 +446,7 @@ void rbInsert(tree_pointer* root, tree_pointer* z){
     (*z)->color = RED;
 
     rbInsertFixup(root, z);
+
 }
 void rbInsertFixup(tree_pointer* root, tree_pointer* w){
 
@@ -486,6 +498,8 @@ void rbInsertFixup(tree_pointer* root, tree_pointer* w){
             }
         }
     }
+
+
 }
 
 tree_pointer rbDelete(tree_pointer* root, tree_pointer* z){
@@ -621,45 +635,19 @@ tree_pointer treeSearch(tree_pointer* x, long k){
 // HELPER
 void getBounds(char row[], long *ind1, long *ind2){
 
-    /*char splitChar = ',';
+    long *ret = malloc(sizeof(long));
 
-    char *token;
-    token = strtok(row, splitChar);
+    *ret = strtol(row, &row, 10);
+    row++;
+    *ind1 = *ret;
+    *ret = strtol(row, &row, 10);
+    *ind2 = *ret;
 
-    while (token != NULL) {
-
-         if(token == ','){
-            ind1 = atoi(token);
-            splitChar = ' ';
-        } else {
-            ind2 = atoi(token);
-        }
-
-        token = strtok(NULL, splitChar);
-    }*/
-
-    long ret;
-
-    for (int i = 0; i < 2; ++i) {
-
-
-        ret = strtol(row, &row, 10);
-        char *ps = row;
-        ps++;
-        row = ps;
-
-        //printf("The number(unsigned long integer) is %ld\n", ret);
-
-        if(i == 0) *ind1 = ret;
-        else *ind2 = ret;
-
-    }
-
-
-
+    free(ret);
 
 }
-struct TreeNode* createTreeNode(long key, struct HistoryNode* text){
+tree_pointer createTreeNode(long key, history_pointer text){
+
     tree_pointer add = malloc(sizeof(typeof(struct TreeNode)));
     add->key = key;
     add->text = text;
@@ -671,16 +659,20 @@ struct TreeNode* createTreeNode(long key, struct HistoryNode* text){
 }
 
 // DOUBLE LINKED LIST
-struct HistoryNode* createNode(char x[]) {
-    struct HistoryNode* newNode= (struct HistoryNode*)malloc(sizeof(struct HistoryNode));
+history_pointer createHistoryNode(char *x) {
+
+    history_pointer newNode = (history_pointer)malloc(sizeof(struct HistoryNode));
+
     strcpy(newNode->value, x);
     newNode->prev = NULL;
     newNode->next = NULL;
+    newNode->tail = NULL;
+
     return newNode;
 }
-void addInHistory(char *x) {
+void addInHistory(char row[]) {
 
-    struct HistoryNode* newNode = createNode(x);
+    history_pointer newNode = createHistoryNode(row);
 
     if(tail == NULL){
         tail = newNode;
