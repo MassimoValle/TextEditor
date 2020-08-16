@@ -241,15 +241,24 @@ int main() {
 
             long numRow = ind2-ind1+1;
 
+            int dotReserve = 0;
+
             // MODO 1
             for (int i = 0; i < numRow; i++) {
 
                 long key = ind1+i;
                 tree_pointer node = treeSearch(root, key);
 
-                if(node != nil){
-                    printf("%s\n", node->text->tail->value);
-                } else printf(".\n");
+                if(node == nil){
+                    node = treeSearch(root_removed, key);
+                    if(node == nil){
+                        printf(".\n");
+                    } else dotReserve++;
+                } else printf("%s\n", node->text->tail->value);
+            }
+
+            for (int i = 0; i < dotReserve; ++i) {
+                printf(".\n");
             }
 
 
