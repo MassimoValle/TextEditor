@@ -26,7 +26,6 @@ struct TreeNode{
 
 };  // single node of the tree
 
-struct HistoryNode* head;
 struct HistoryNode* tail;
 
 tree_pointer nil;
@@ -36,19 +35,19 @@ tree_pointer nil;
 
 
 // RED BLACK TREE
-void leftRotate(tree_pointer* root, tree_pointer z);
-void rightRotate(tree_pointer* root, tree_pointer z);
+void leftRotate(tree_pointer* root, tree_pointer* z);
+void rightRotate(tree_pointer* root, tree_pointer* z);
 
-void rbInsert(tree_pointer* root, tree_pointer z);
-void rbInsertFixup(tree_pointer* root, tree_pointer w);
+void rbInsert(tree_pointer* root, tree_pointer* z);
+void rbInsertFixup(tree_pointer* root, tree_pointer* w);
 
-tree_pointer rbDelete(tree_pointer* T, tree_pointer z);
-void rbDeleteFixup(tree_pointer* T, tree_pointer x);
+tree_pointer rbDelete(tree_pointer* T, tree_pointer* z);
+void rbDeleteFixup(tree_pointer* T, tree_pointer* x);
 
-tree_pointer treeSuccessor(tree_pointer x);
-tree_pointer treeMinimum(tree_pointer x);
+tree_pointer treeSuccessor(tree_pointer* x);
+tree_pointer treeMinimum(tree_pointer* x);
 
-tree_pointer treeSearch(tree_pointer x, long k);
+tree_pointer treeSearch(tree_pointer* x, long k);
 
 // HELPER
 void getBounds(char row[], long *ind1, long *ind2);
@@ -86,12 +85,7 @@ int main() {
 
             long ind1 = 0, ind2 = 0;
 
-            unsigned long length = strlen(row);
-            char copy[length-1];
-
-            strncpy(copy, row, length - 1);
-
-            getBounds(copy, &ind1, &ind2);
+            getBounds(row, &ind1, &ind2);
 
             long numRow = ind2-ind1+1;
 
@@ -103,7 +97,7 @@ int main() {
 
                 long key = ind1+i;
 
-                tree_pointer node = treeSearch(root, key);
+                tree_pointer node = treeSearch(&root, key);
 
                 if(node != nil){
 
@@ -127,7 +121,7 @@ int main() {
                     x->right = nil;
                     x->prev = nil;
 
-                    rbInsert(&root, x);
+                    rbInsert(&root, &x);
                 }
 
 
@@ -192,12 +186,12 @@ int main() {
             for (int i = 0; i < numRow; i++) {
 
                 long key = ind1+i;
-                tree_pointer node = treeSearch(root, key);
+                tree_pointer node = treeSearch(&root, key);
 
                 if(node != nil){
 
                     if(node->text == NULL){
-                        rbDelete(&root, node);
+                        rbDelete(&root, &node);
                     } else{
 
                         /*tree_pointer add = malloc(sizeof(typeof(struct TreeNode)));
@@ -209,8 +203,8 @@ int main() {
 
                         tree_pointer add = createTreeNode(node->key, node->text);
 
-                        rbDelete(&root, node);
-                        rbInsert(&root_removed, add);
+                        rbDelete(&root, &node);
+                        rbInsert(&root_removed, &add);
                     }
 
 
@@ -231,10 +225,10 @@ int main() {
             for (int i = 0; i < numRow; i++) {
 
                 long key = ind1+i;
-                tree_pointer node = treeSearch(root, key);
+                tree_pointer node = treeSearch(&root, key);
 
                 if(node == nil){
-                    node = treeSearch(root_removed, key);
+                    node = treeSearch(&root_removed, key);
                     if(node == nil){
                         printf(".\n");
                     } else dotReserve++;
@@ -276,12 +270,12 @@ int main() {
                 for (int j = 0; j < numRow; ++j) {
 
                     long key = ind1+j;
-                    tree_pointer node = treeSearch(root, key);
+                    tree_pointer node = treeSearch(&root, key);
 
                     if(node != nil){
                         node->text->tail = node->text->tail->prev;
                     } else{
-                        node = treeSearch(root_removed, key);
+                        node = treeSearch(&root_removed, key);
 
                         if(node != nil){
 
@@ -294,8 +288,8 @@ int main() {
 
                             tree_pointer add = createTreeNode(node->key, node->text);
 
-                            rbDelete(&root_removed, node);
-                            rbInsert(&root, add);
+                            rbDelete(&root_removed, &node);
+                            rbInsert(&root, &add);
                         }
 
                     }
@@ -322,7 +316,7 @@ int main() {
                     for (int j = 0; j < numRow; ++j) {
 
                         long key = ind1+j;
-                        tree_pointer node = treeSearch(root, key);
+                        tree_pointer node = treeSearch(&root, key);
 
                         if(tail->next->value[3] == 'd'){
 
@@ -335,8 +329,8 @@ int main() {
 
                             tree_pointer add = createTreeNode(node->key, node->text);
 
-                            rbDelete(&root, node);
-                            rbInsert(&root_removed, add);
+                            rbDelete(&root, &node);
+                            rbInsert(&root_removed, &add);
                         }
                         else if(node->text->tail->next != NULL){
                             node->text->tail = node->text->tail->next;
@@ -368,9 +362,9 @@ int main() {
 
 
 // RED BLACK TREE
-void leftRotate(tree_pointer* root, tree_pointer z){
+void leftRotate(tree_pointer* root, tree_pointer* z){
 
-    tree_pointer x = z;
+    tree_pointer x = *z;
     tree_pointer y = x->right;
     x->right = y->left;
     if (y->left != nil){
@@ -390,9 +384,9 @@ void leftRotate(tree_pointer* root, tree_pointer z){
     x->prev = y;
 
 }
-void rightRotate(tree_pointer* root, tree_pointer z){
+void rightRotate(tree_pointer* root, tree_pointer* z){
 
-    tree_pointer x = z;
+    tree_pointer x = *z;
     tree_pointer y = x->left;
     x->left = y->right;
     if (y->right != nil){
@@ -412,39 +406,39 @@ void rightRotate(tree_pointer* root, tree_pointer z){
     x->prev = y;
 }
 
-void rbInsert(tree_pointer* root, tree_pointer z){
+void rbInsert(tree_pointer* root, tree_pointer* z){
 
     tree_pointer y = nil;
     tree_pointer x = *root;
 
     while (x != nil){
         y = x;
-        if(z->key < x->key){
+        if((*z)->key < x->key){
             x = x->left;
         } else{
             x = x->right;
         }
     }
 
-    z->prev = y;
+    (*z)->prev = y;
 
     if(y == nil){
-        *root = z;
-    } else if(z->key < y->key){
-        y->left = z;
+        *root = *z;
+    } else if((*z)->key < y->key){
+        y->left = *z;
     } else{
-        y->right = z;
+        y->right = *z;
     }
 
-    z->left = nil;
-    z->right = nil;
-    z->color = RED;
+    (*z)->left = nil;
+    (*z)->right = nil;
+    (*z)->color = RED;
 
     rbInsertFixup(root, z);
 }
-void rbInsertFixup(tree_pointer* root, tree_pointer w){
+void rbInsertFixup(tree_pointer* root, tree_pointer* w){
 
-    tree_pointer z = w;
+    tree_pointer z = *w;
     tree_pointer y, x;
     if (z==*root){
         (*root)->color = BLACK;
@@ -458,17 +452,17 @@ void rbInsertFixup(tree_pointer* root, tree_pointer w){
                     x->color = BLACK;
                     y->color = BLACK;
                     x->prev->color = RED;
-                    rbInsertFixup(root, x->prev);
+                    rbInsertFixup(root, &x->prev);
                 }
                 else {
                     if (z==x->right){
                         z = x;
-                        leftRotate(root, z);
+                        leftRotate(root, &z);
                         x = z->prev;
                     }
                     x->color = BLACK;
                     x->prev->color = RED;
-                    rightRotate(root, x->prev);
+                    rightRotate(root, &x->prev);
                 }
             }
             else {
@@ -477,29 +471,29 @@ void rbInsertFixup(tree_pointer* root, tree_pointer w){
                     x->color = BLACK;
                     y->color = BLACK;
                     x->prev->color = RED;
-                    rbInsertFixup(root, x->prev);
+                    rbInsertFixup(root, &x->prev);
                 }
                 else {
                     if (z==x->left){
                         z = x;
-                        rightRotate(root, z);
+                        rightRotate(root, &z);
                         x = z->prev;
                     }
                     x->color = BLACK;
                     x->prev->color = RED;
-                    leftRotate(root, x->prev);
+                    leftRotate(root, &x->prev);
                 }
             }
         }
     }
 }
 
-tree_pointer rbDelete(tree_pointer* root, tree_pointer z){
+tree_pointer rbDelete(tree_pointer* root, tree_pointer* z){
 
     tree_pointer x, y;
 
-    if(z->left == nil || z->right == nil){
-        y = z;
+    if((*z)->left == nil || (*z)->right == nil){
+        y = *z;
     } else{
         y = treeSuccessor(z);
     }
@@ -520,108 +514,108 @@ tree_pointer rbDelete(tree_pointer* root, tree_pointer z){
         y->prev->right = x;
     }
 
-    if(y != z){
-        z->key = y->key;
-        z->text = y->text;
+    if(y != *z){
+        (*z)->key = y->key;
+        (*z)->text = y->text;
     }
 
     if(y->color == BLACK){
-        rbDeleteFixup(root, x);
+        rbDeleteFixup(root, &x);
     }
 
     return y;
 
 }
-void rbDeleteFixup(tree_pointer* root, tree_pointer x){
+void rbDeleteFixup(tree_pointer* root, tree_pointer* x){
 
-    if(x->color == RED || x->prev == nil){
-        x->color = BLACK;
-    } else if(x == x->prev->left){
+    if((*x)->color == RED || (*x)->prev == nil){
+        (*x)->color = BLACK;
+    } else if(x == &((*x)->prev)->left){
 
-        tree_pointer w = x->prev->right;
+        tree_pointer w = (*x)->prev->right;
 
         if(w->color == RED){
             w->color = BLACK;
-            x->prev->color = RED;
-            leftRotate(root, x->prev);
-            w = x->prev->right;
+            (*x)->prev->color = RED;
+            leftRotate(root, &((*x)->prev));
+            w = (*x)->prev->right;
         }
         if(w->left->color == BLACK && w->right->color == BLACK){
             w->color = RED;
-            rbDeleteFixup(root, x->prev);
+            rbDeleteFixup(root, &((*x)->prev));
         } else {
             if(w->right->color == BLACK) {
                 w->left->color = BLACK;
                 w->color = RED;
-                rightRotate(root, w);
-                w = x->prev->right;
+                rightRotate(root, &w);
+                w = (*x)->prev->right;
             }
 
-            w->color = x->prev->color;
-            x->prev->color = BLACK;
+            w->color = (*x)->prev->color;
+            (*x)->prev->color = BLACK;
             w->right->color = BLACK;
-            leftRotate(root, x->prev);
+            leftRotate(root, &((*x)->prev));
         }
     } else{
 
-        tree_pointer w = x->prev->left;
+        tree_pointer w = (*x)->prev->left;
 
         if(w->color == RED){
             w->color = BLACK;
-            x->prev->color = RED;
-            rightRotate(root, x->prev);
-            w = x->prev->left;
+            (*x)->prev->color = RED;
+            rightRotate(root, &((*x)->prev));
+            w = (*x)->prev->left;
         }
         if(w->right->color == BLACK && w->left->color == BLACK){
             w->color = RED;
-            rbDeleteFixup(root, x->prev);
+            rbDeleteFixup(root, &((*x)->prev));
         } else {
             if(w->left->color == BLACK) {
                 w->right->color = BLACK;
                 w->color = RED;
-                leftRotate(root, w);
-                w = x->prev->left;
+                leftRotate(root, &w);
+                w = (*x)->prev->left;
             }
 
-            w->color = x->prev->color;
-            x->prev->color = BLACK;
+            w->color = (*x)->prev->color;
+            (*x)->prev->color = BLACK;
             w->left->color = BLACK;
-            rightRotate(root, x->prev);
+            rightRotate(root, &((*x)->prev));
         }
 
     }
 
 }
 
-tree_pointer treeSuccessor(tree_pointer x){
-    if(x->right != nil){
-        return treeMinimum(x->right);
+tree_pointer treeSuccessor(tree_pointer* x){
+    if((*x)->right != nil){
+        return treeMinimum(&(*x)->right);
     }
 
-    tree_pointer y = x->prev;
+    tree_pointer y = (*x)->prev;
 
-    while (y != nil && x == y->right){
-        x = y;
+    while (y != nil && *x == y->right){
+        *x = y;
         y = y->prev;
     }
 
     return y;
 }
-tree_pointer treeMinimum(tree_pointer x){
-    while (x->left != nil){
-        x = x->left;
+tree_pointer treeMinimum(tree_pointer* x){
+    while ((*x)->left != nil){
+        *x = (*x)->left;
     }
-    return x;
+    return *x;
 }
 
-tree_pointer treeSearch(tree_pointer x, long k){
-    if(x == nil || k == x->key){
-        return x;
+tree_pointer treeSearch(tree_pointer* x, long k){
+    if(*x == nil || k == (*x)->key){
+        return *x;
     }
 
-    if(k < x->key){
-        return treeSearch(x->left, k);
-    } else return treeSearch(x->right, k);
+    if(k < (*x)->key){
+        return treeSearch(&(*x)->left, k);
+    } else return treeSearch(&(*x)->right, k);
 }
 
 // HELPER
@@ -688,8 +682,7 @@ void addInHistory(char *x) {
 
     struct HistoryNode* newNode = createNode(x);
 
-    if(head == NULL){
-        head = newNode;
+    if(tail == NULL){
         tail = newNode;
         return;
     }
