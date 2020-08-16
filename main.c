@@ -36,14 +36,14 @@ tree_pointer nil;
 
 
 // RED BLACK TREE
-void leftRotate(tree_pointer root, tree_pointer z);
-void rightRotate(tree_pointer root, tree_pointer z);
+void leftRotate(tree_pointer* root, tree_pointer z);
+void rightRotate(tree_pointer* root, tree_pointer z);
 
-void rbInsert(tree_pointer root, tree_pointer z);
-void rbInsertFixup(tree_pointer root, tree_pointer w);
+void rbInsert(tree_pointer* root, tree_pointer z);
+void rbInsertFixup(tree_pointer* root, tree_pointer w);
 
-tree_pointer rbDelete(tree_pointer T, tree_pointer z);
-void rbDeleteFixup(tree_pointer T, tree_pointer x);
+tree_pointer rbDelete(tree_pointer* T, tree_pointer z);
+void rbDeleteFixup(tree_pointer* T, tree_pointer x);
 
 tree_pointer treeSuccessor(tree_pointer x);
 tree_pointer treeMinimum(tree_pointer x);
@@ -57,12 +57,30 @@ void getBounds(char row[], long *ind1, long *ind2);
 struct HistoryNode* createNode(char x[]);
 void addInHistory(char *x);
 
+/*
+void change(int* x){
+    *x = 5;
+}
 
-
-
+void change2(tree_pointer* y){
+    printf("%ld\n", (*y)->key);
+    (*y)->key = 10;
+}*/
 
 
 int main() {
+
+    /*int x = 0;
+    change(&x);
+    printf("%d\n", x);
+
+    tree_pointer y = malloc(sizeof(struct TreeNode));
+    y->key = 5;
+    change2(&y);
+    printf("%ld\n", y->key);*/
+
+
+
 
     tree_pointer root;              // main tree to show
     tree_pointer root_removed;      // tree with removed nodes
@@ -127,15 +145,52 @@ int main() {
                     x->right = nil;
                     x->prev = nil;
 
-                    rbInsert(root, x);
+                    rbInsert(&root, x);
                 }
 
 
             }
 
+            // MODO 2
+            /*gets(row);
+            tree_pointer node = treeSearch(root, ind1);
+
+            for (int i = 1; i < numRow; i++) {
+
+                if(node != nil){
+
+                    struct HistoryNode* n = createNode(row);
+
+                    node->text->tail->next = n;
+                    n->prev = node->text->tail;
+                    node->text->tail = n;
+
+                } else{
+
+                    tree_pointer x = malloc(sizeof(typeof(struct TreeNode)));
+
+                    x->key = ind1+i-1;
+
+                    struct HistoryNode* n = createNode(row);
+                    x->text = n;
+                    x->text->tail = n;
+
+                    x->left = nil;
+                    x->right = nil;
+                    x->prev = nil;
+
+                    rbInsert(&root, x);
+                }
+
+                node = treeSuccessor(node);
+                gets(row);
+
+            }*/
+
             gets(row);
-            if(strcmp(row, ".") == 0){
-                printf("command executed\n");
+
+            if(strcmp(row, ".") != 0) {
+                printf("Something went wrong\n");
             }
 
         }
@@ -157,14 +212,14 @@ int main() {
                 if(node != nil){
 
                     if(node->text == NULL){
-                        rbDelete(root, node);
+                        rbDelete(&root, node);
                     } else{
-                        rbDelete(root, node);
+                        rbDelete(&root, node);
 
                         node->prev = nil;
                         node->left = nil;
                         node->right = nil;
-                        rbInsert(root_removed, node);
+                        rbInsert(&root_removed, node);
                     }
 
 
@@ -185,26 +240,29 @@ int main() {
                 long key = ind1+i;
                 tree_pointer node = treeSearch(root, key);
 
-                if(node != NULL){
+                if(node != nil){
                     printf("%s\n", node->text->tail->value);
                 } else printf(".\n");
             }
 
 
             // MODO 2
-            /*tree_pointer node = treeSearch(tree, ind1);
-            printf("%s", node->string);
+            /*tree_pointer node = treeSearch(root, ind1);
 
             for (int i = 1; i < numRow; i++) {
 
+                if(node != nil){
+                    printf("%s\n", node->text->tail->value);
+                } else printf(".\n");
+
                 node = treeSuccessor(node);
-                printf("%s", node->string);
             }*/
 
         }
         else if (strstr(row, "u") != NULL) {
 
-            long ret = strtol(row, (char **) row, 10);
+            char* q;
+            long ret = strtol(row, &q, 10);
 
             undo += ret;
 
@@ -224,8 +282,16 @@ int main() {
                         node->text->tail = node->text->tail->prev;
                     } else{
                         node = treeSearch(root_removed, key);
-                        rbInsert(root, node);
-                        rbDelete(root_removed, node);
+
+                        if(node != nil){
+                            rbDelete(&root_removed, node);
+
+                            node->prev = nil;
+                            node->left = nil;
+                            node->right = nil;
+                            rbInsert(&root, node);
+                        }
+
                     }
                 }
 
@@ -237,7 +303,8 @@ int main() {
 
             if(undo > 0){
 
-                long ret = strtol(row, (char **) row, 10);
+                char* q;
+                long ret = strtol(row, &q, 10);
 
                 for (int i = 0; i < ret; ++i) {
                     long ind1, ind2;
@@ -252,12 +319,12 @@ int main() {
                         tree_pointer node = treeSearch(root, key);
 
                         if(tail->next->value[3] == 'd'){
-                            rbDelete(root, node);
+                            rbDelete(&root, node);
 
                             node->prev = nil;
                             node->left = nil;
                             node->right = nil;
-                            rbInsert(root_removed, node);
+                            rbInsert(&root_removed, node);
                         }
                         else if(node->text->tail->next != NULL){
                             node->text->tail = node->text->tail->next;
@@ -288,7 +355,7 @@ int main() {
 
 
 // RED BLACK TREE
-void leftRotate(tree_pointer root, tree_pointer z){
+void leftRotate(tree_pointer* root, tree_pointer z){
 
     tree_pointer x = z;
     tree_pointer y = x->right;
@@ -298,7 +365,7 @@ void leftRotate(tree_pointer root, tree_pointer z){
     }
     y->prev = x->prev;
     if (x->prev == nil){
-        root = y;
+        *root = y;
     }
     else if (x == x->prev->left){
         x->prev->left = y;
@@ -310,7 +377,7 @@ void leftRotate(tree_pointer root, tree_pointer z){
     x->prev = y;
 
 }
-void rightRotate(tree_pointer root, tree_pointer z){
+void rightRotate(tree_pointer* root, tree_pointer z){
 
     tree_pointer x = z;
     tree_pointer y = x->left;
@@ -320,7 +387,7 @@ void rightRotate(tree_pointer root, tree_pointer z){
     }
     y->prev = x->prev;
     if (x->prev == nil){
-        root = y;
+        *root = y;
     }
     else if (x == x->prev->left){
         x->prev->left = y;
@@ -332,10 +399,10 @@ void rightRotate(tree_pointer root, tree_pointer z){
     x->prev = y;
 }
 
-void rbInsert(tree_pointer root, tree_pointer z){
+void rbInsert(tree_pointer* root, tree_pointer z){
 
     tree_pointer y = nil;
-    tree_pointer x = root;
+    tree_pointer x = *root;
 
     while (x != nil){
         y = x;
@@ -349,7 +416,7 @@ void rbInsert(tree_pointer root, tree_pointer z){
     z->prev = y;
 
     if(y == nil){
-        root = z;
+        *root = z;
     } else if(z->key < y->key){
         y->left = z;
     } else{
@@ -362,12 +429,12 @@ void rbInsert(tree_pointer root, tree_pointer z){
 
     rbInsertFixup(root, z);
 }
-void rbInsertFixup(tree_pointer root, tree_pointer w){
+void rbInsertFixup(tree_pointer* root, tree_pointer w){
 
     tree_pointer z = w;
     tree_pointer y, x;
-    if (z==root){
-        root->color = BLACK;
+    if (z==*root){
+        (*root)->color = BLACK;
     }
     else {
         x = z->prev;
@@ -414,7 +481,7 @@ void rbInsertFixup(tree_pointer root, tree_pointer w){
     }
 }
 
-tree_pointer rbDelete(tree_pointer root, tree_pointer z){
+tree_pointer rbDelete(tree_pointer* root, tree_pointer z){
 
     tree_pointer x, y;
 
@@ -433,7 +500,7 @@ tree_pointer rbDelete(tree_pointer root, tree_pointer z){
     x->prev = y->prev;
 
     if(y->prev == nil){
-        root = x;
+        *root = x;
     } else if(y == y->prev->left){
         y->prev->left = x;
     } else{
@@ -451,7 +518,7 @@ tree_pointer rbDelete(tree_pointer root, tree_pointer z){
     return y;
 
 }
-void rbDeleteFixup(tree_pointer root, tree_pointer x){
+void rbDeleteFixup(tree_pointer* root, tree_pointer x){
 
     if(x->color == RED || x->prev == nil){
         x->color = BLACK;
@@ -513,7 +580,7 @@ void rbDeleteFixup(tree_pointer root, tree_pointer x){
 }
 
 tree_pointer treeSuccessor(tree_pointer x){
-    if(x->right == nil){
+    if(x->right != nil){
         return treeMinimum(x->right);
     }
 
