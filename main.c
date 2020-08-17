@@ -12,7 +12,7 @@ enum Color {
 };
 
 struct HistoryNode {
-    char value[ROW_LEN];
+    char* value;
     history_pointer next;
     history_pointer prev;
     history_pointer tail;
@@ -31,7 +31,10 @@ struct TreeNode{
 
 
 tree_pointer nil;
+history_pointer head;
 history_pointer tail;
+
+char* row;
 
 
 
@@ -44,7 +47,7 @@ void rightRotate(tree_pointer* root, tree_pointer* z);
 void rbInsert(tree_pointer* root, tree_pointer* z);
 void rbInsertFixup(tree_pointer* root, tree_pointer* w);
 
-tree_pointer rbDelete(tree_pointer* T, tree_pointer* z);
+void rbDelete(tree_pointer* T, tree_pointer* z);
 void rbDeleteFixup(tree_pointer* T, tree_pointer* x);
 
 tree_pointer treeSuccessor(tree_pointer* x);
@@ -52,7 +55,10 @@ tree_pointer treeMinimum(tree_pointer* x);
 
 tree_pointer treeSearch(tree_pointer* x, long k);
 
+void cleanUpTree(tree_pointer* x);
+
 // HELPER
+char* getRow();
 void getBounds(char row[], long *ind1, long *ind2);
 tree_pointer createTreeNode(long key, history_pointer text);
 
@@ -60,6 +66,7 @@ tree_pointer createTreeNode(long key, history_pointer text);
 history_pointer createHistoryNode(char *x);
 void addInHistory(char row[]);
 void freeUnusedHistoryNode();
+void cleanUpHistory(history_pointer head);
 
 
 
@@ -74,12 +81,11 @@ int main() {
     root_removed = nil;
 
 
-    //char* row = malloc(sizeof(char) * ROW_LEN);
-    char* row = calloc(sizeof(char), ROW_LEN);
+    row;
+    //char* row = calloc(sizeof(char), ROW_LEN);
     long undo = 0;                  // used to know how many undo I've made
 
-    fgets(row, ROW_LEN, stdin);     // fgets gets '\n' at the end of the string
-    strtok(row, "\n");
+    row = getRow();
 
     while (strstr(row, "q") == NULL){
 
@@ -99,8 +105,7 @@ int main() {
             // MODO 1
             for (int i = 0; i < numRow; i++) {
 
-                fgets(row, ROW_LEN, stdin);
-                strtok(row, "\n");
+                getRow();
 
                 long key = ind1+i;
 
@@ -135,8 +140,7 @@ int main() {
             }
 
             // MODO 2
-            /*fgets(row, ROW_LEN, stdin);
-            strtok(row, "\n");
+            /*getRow();
             tree_pointer node = treeSearch(root, ind1);
 
             for (int i = 1; i < numRow; i++) {
@@ -167,17 +171,15 @@ int main() {
                 }
 
                 node = treeSuccessor(node);
-                fgets(row, ROW_LEN, stdin);
-                strtok(row, "\n");
+                getRow();
 
             }*/
 
-            fgets(row, ROW_LEN, stdin);
-            strtok(row, "\n");
+            getRow();
 
-            if(strcmp(row, ".") != 0) {
-                printf("Something went wrong\n");
-            }
+            if(strstr(row, ".") != NULL){
+                free(row);
+            } else printf("something went wrong");
 
         }
         else if (strstr(row, "d") != NULL) {
@@ -226,6 +228,8 @@ int main() {
             long ind1, ind2;
             getBounds(row, &ind1, &ind2);
 
+            free(row);
+
             long numRow = ind2-ind1+1;
 
             int dotReserve = 0;
@@ -266,6 +270,8 @@ int main() {
 
             char* q;
             long ret = strtol(row, &q, 10);
+
+            free(row);
 
             undo += ret;
 
@@ -315,6 +321,8 @@ int main() {
                 char* q;
                 long ret = strtol(row, &q, 10);
 
+                free(row);
+
                 for (int i = 0; i < ret; ++i) {
                     long ind1, ind2;
 
@@ -357,17 +365,16 @@ int main() {
 
         }
 
-
-        fgets(row, ROW_LEN, stdin);
-        strtok(row, "\n");
+        getRow();
 
     }
 
-    /*free(root);
-    free(root_removed);
-    free(nil); //exc
+
+    cleanUpTree(&root);
+    cleanUpTree(&root_removed);
+    free(nil);
     free(row);
-    free(tail);*/
+    cleanUpHistory(head);
 
     return 0;
 }
@@ -505,7 +512,7 @@ void rbInsertFixup(tree_pointer* root, tree_pointer* w){
 
 }
 
-tree_pointer rbDelete(tree_pointer* root, tree_pointer* z){
+void rbDelete(tree_pointer* root, tree_pointer* z){
 
     tree_pointer x, y;
 
@@ -540,7 +547,7 @@ tree_pointer rbDelete(tree_pointer* root, tree_pointer* z){
         rbDeleteFixup(root, &x);
     }
 
-    return y;
+    free(y);
 
 }
 void rbDeleteFixup(tree_pointer* root, tree_pointer* x){
@@ -635,7 +642,28 @@ tree_pointer treeSearch(tree_pointer* x, long k){
     } else return treeSearch(&(*x)->right, k);
 }
 
+void cleanUpTree(tree_pointer* x){
+    if(*x != nil){
+        cleanUpTree(&(*x)->left);
+        cleanUpTree(&(*x)->right);
+
+        cleanUpHistory((*x)->text);
+        free(*x);
+
+    }
+}
+
 // HELPER
+char* getRow(){
+    
+    row = NULL;
+    row = malloc(sizeof(char) * ROW_LEN);
+    fgets(row, ROW_LEN, stdin);     // fgets gets '\n' at the end of the string
+
+    strtok(row, "\n");
+
+    return row;
+}
 void getBounds(char row[], long *ind1, long *ind2){
 
     long *ret = malloc(sizeof(long));
@@ -666,7 +694,8 @@ history_pointer createHistoryNode(char *x) {
 
     history_pointer newNode = (history_pointer)malloc(sizeof(struct HistoryNode));
 
-    strcpy(newNode->value, x);
+    //strcpy(newNode->value, x);
+    newNode->value = x;
     newNode->prev = NULL;
     newNode->next = NULL;
     newNode->tail = NULL;
@@ -678,6 +707,7 @@ void addInHistory(char row[]) {
     history_pointer newNode = createHistoryNode(row);
 
     if(tail == NULL){
+        head = newNode;
         tail = newNode;
         return;
     }
@@ -696,7 +726,7 @@ void freeUnusedHistoryNode(){
         while (bulldozer != NULL) {
             if (bulldozer->next != NULL) {
                 nextMiles = bulldozer->next;
-            }
+            } else nextMiles = NULL;
             free(bulldozer);
             bulldozer = nextMiles;
         }
@@ -712,4 +742,18 @@ void freeUnusedHistoryNode(){
 
     }
 
+}
+void cleanUpHistory(history_pointer head){
+
+    history_pointer bulldozer = head;
+    history_pointer nextMiles = NULL;
+
+    while (bulldozer != NULL) {
+        if (bulldozer->next != NULL) {
+            nextMiles = bulldozer->next;
+        } else nextMiles = NULL;
+        free(bulldozer->value);
+        free(bulldozer);
+        bulldozer = nextMiles;
+    }
 }
