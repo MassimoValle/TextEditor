@@ -59,6 +59,7 @@ tree_pointer createTreeNode(long key, history_pointer text);
 // DOUBLE LINKED LIST
 history_pointer createHistoryNode(char *x);
 void addInHistory(char row[]);
+void freeUnusedHistoryNode();
 
 
 
@@ -86,6 +87,7 @@ int main() {
         if (strstr(row, "c") != NULL) {
 
             undo = 0;
+            freeUnusedHistoryNode();
             addInHistory(row);
 
             long ind1 = 0, ind2 = 0;
@@ -181,6 +183,7 @@ int main() {
         else if (strstr(row, "d") != NULL) {
 
             undo = 0;
+            freeUnusedHistoryNode();
             addInHistory(row);
 
             long ind1, ind2;
@@ -682,4 +685,31 @@ void addInHistory(char row[]) {
     tail->next = newNode;
     newNode->prev = tail;
     tail = newNode;
+}
+void freeUnusedHistoryNode(){
+
+    if(tail != NULL && tail->next != NULL){
+
+        history_pointer bulldozer = tail->next;
+        history_pointer nextMiles = NULL;
+
+        while (bulldozer != NULL) {
+            if (bulldozer->next != NULL) {
+                nextMiles = bulldozer->next;
+            }
+            free(bulldozer);
+            bulldozer = nextMiles;
+        }
+
+
+        /*while (bulldozer != NULL){
+
+            if(bulldozer->next != NULL) {
+                bulldozer = bulldozer->next;
+                free(bulldozer->prev);
+            } else free(bulldozer);
+        }*/
+
+    }
+
 }
