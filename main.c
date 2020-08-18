@@ -202,7 +202,6 @@ int main() {
 
                     if(node->text == NULL){
                         rbDelete(&root, &node);
-                        free(node);
                     } else{
 
                         /*tree_pointer add = malloc(sizeof(typeof(struct TreeNode)));
@@ -547,7 +546,7 @@ void rbDelete(tree_pointer* root, tree_pointer* z){
         rbDeleteFixup(root, &x);
     }
 
-    free(y);
+    free(*z);
 
 }
 void rbDeleteFixup(tree_pointer* root, tree_pointer* x){
@@ -657,10 +656,18 @@ void cleanUpTree(tree_pointer* x){
 char* getRow(){
     
     row = NULL;
-    row = malloc(sizeof(char) * ROW_LEN);
-    fgets(row, ROW_LEN, stdin);     // fgets gets '\n' at the end of the string
 
-    strtok(row, "\n");
+    char tmp[1024];
+
+    fgets(tmp, ROW_LEN, stdin);     // fgets gets '\n' at the end of the string
+    strtok(tmp, "\n");
+
+    unsigned long len = strlen(tmp);
+
+    row = malloc(sizeof(char) * (len+1));
+
+    strncpy(row, tmp, len);
+
 
     return row;
 }
