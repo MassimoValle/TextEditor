@@ -66,7 +66,7 @@ tree_pointer createTreeNode(long key, history_pointer text);
 history_pointer createHistoryNode(char *x);
 void addInHistory(char row[]);
 void freeUnusedHistoryNode();
-void cleanUpHistory(history_pointer head);
+void cleanUpHistoryFromHead(history_pointer head);
 
 
 
@@ -211,10 +211,40 @@ int main() {
                         add->left = nil;
                         add->right = nil;*/
 
-                        tree_pointer add = createTreeNode(node->key, node->text);
+                        tree_pointer node2 = treeSearch(&root, key+numRow);
 
-                        rbDelete(&root, &node);
-                        rbInsert(&root_removed, &add);
+                        if(node2 != nil){
+
+                            node->text->tail->next = node2->text;
+                            node2->text->prev = node->text->tail;
+                            node->text->tail = node2->text->tail;
+
+                            rbDelete(&root, &node2);
+
+                        } else{
+
+                            node2 = treeSearch(&root_removed, key);
+
+                            if(node2 != nil){
+
+                                node2->text->tail->next = node->text;
+                                node->text->prev = node2->text->tail;
+                                node2->text->tail = node->text;
+
+                                rbDelete(&root, &node);
+
+
+                            } else{
+
+                                tree_pointer add = createTreeNode(node->key, node->text);
+
+                                rbDelete(&root, &node);
+                                rbInsert(&root_removed, &add);
+
+                            }
+
+                        }
+
                     }
 
 
@@ -373,7 +403,7 @@ int main() {
     cleanUpTree(&root_removed);
     free(nil);
     free(row);
-    cleanUpHistory(head);
+    cleanUpHistoryFromHead(head);
 
     return 0;
 }
@@ -646,7 +676,7 @@ void cleanUpTree(tree_pointer* x){
         cleanUpTree(&(*x)->left);
         cleanUpTree(&(*x)->right);
 
-        cleanUpHistory((*x)->text);
+        cleanUpHistoryFromHead((*x)->text);
         free(*x);
 
     }
@@ -750,7 +780,7 @@ void freeUnusedHistoryNode(){
     }
 
 }
-void cleanUpHistory(history_pointer head){
+void cleanUpHistoryFromHead(history_pointer head){
 
     history_pointer bulldozer = head;
     history_pointer nextMiles = NULL;
