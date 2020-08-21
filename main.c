@@ -95,6 +95,8 @@ tree_pointer treeMinimum(tree_pointer* x);
 
 tree_pointer treeSearch(tree_pointer* x, long k);
 
+void cleanUpTree(tree_pointer* x);
+
 
 
 // CREATE NODES
@@ -126,9 +128,9 @@ container_pointer listSearch(document_pointer* document, container_pointer* k);
 void createHeadDocumentRemoved(documentRemoved_pointer* docRem, remove_pointer* c);
 void appendNodeToDocumentRemoved(documentRemoved_pointer* docRem, remove_pointer* c);
 int undoChange(document_pointer* document, long num);
-int undoDelete(document_pointer* document, documentRemoved_pointer* docRem, long index);
+int undoDelete(document_pointer* document, documentRemoved_pointer* oldNodes, documentRemoved_pointer* futureNodes, long index);
 void redoChange(document_pointer* document, long num);
-int redoDelete(document_pointer* doc, documentRemoved_pointer* docRem, long index);
+int redoDelete(document_pointer* doc, documentRemoved_pointer* oldNodes, documentRemoved_pointer* futureNodes, long index);
 
 
 // HELPER
@@ -140,13 +142,14 @@ void getBounds(char* line, long *ind1, long *ind2);
 
 int main() {
 
-    nil = malloc(sizeof(struct TreeNode));
+    nil = (tree_pointer)malloc(sizeof(struct TreeNode));
     nil->color = BLACK;
 
     tree_root = nil;
 
     document_pointer document = createDocument();
-    documentRemoved_pointer rowRemoved = createDocumentRemoved();
+    documentRemoved_pointer oldNodes = createDocumentRemoved();
+    documentRemoved_pointer futureNodes = createDocumentRemoved();
 
     long undo = 0;
 
@@ -159,16 +162,16 @@ int main() {
 
             if(undo > 0){
 
-                if(rowRemoved->head == NULL){
+                if(oldNodes->head == NULL){
                     freeUnusedHistoryNode();
                     freeUnusedContainerNode(&document);
                 } else{
-                    freeUnusedRemoveContainer(&rowRemoved);
+                    freeUnusedRemoveContainer(&oldNodes);
                 }
             }
 
             undo = 0;
-            addInHistory(row);
+            addInHistory();
 
             long ind1 = 0, ind2 = 0;
 
@@ -197,16 +200,16 @@ int main() {
 
             if(undo > 0){
 
-                if(rowRemoved->head == NULL){
+                if(oldNodes->head == NULL){
                     freeUnusedHistoryNode();
                     freeUnusedContainerNode(&document);
                 } else{
-                    freeUnusedRemoveContainer(&rowRemoved);
+                    freeUnusedRemoveContainer(&oldNodes);
                 }
             }
 
             undo = 0;
-            addInHistory(row);
+            addInHistory();
 
             long ind1, ind2;
             getBounds(row, &ind1, &ind2);
@@ -230,11 +233,12 @@ int main() {
 
             for (int i = 0; i < numRow; i++) {
 
-                int res = removeToDocument(&document, &rowRemoved, &headDel, tail_history->value);
+                int res = removeToDocument(&document, &oldNodes, &headDel, tail_history->value);
 
                 if(res > 0){
                     tree_pointer delNode = treeSearch(&tree_root, ind1 + i);
                     rbDelete(&tree_root, &delNode);
+                    free(delNode);
                 }
 
 
@@ -330,7 +334,7 @@ int main() {
 
                     } else{
 
-                        int val = undoDelete(&document, &rowRemoved, ind1+j);
+                        int val = undoDelete(&document, &oldNodes, &futureNodes, ind1 + j);
 
                         if(val == 0){
                             continue;
@@ -371,7 +375,7 @@ int main() {
 
                         } else{
 
-                            redoDelete(&document, &rowRemoved, ind1+j);
+                            redoDelete(&document, &oldNodes, &futureNodes, ind1 + j);
 
                         }
 
@@ -393,16 +397,21 @@ int main() {
 
     }
 
-    cleanUpDocumentRemoved(&document, &rowRemoved);
+    cleanUpDocumentRemoved(&document, &oldNodes);
     cleanUpHistoryFromHead(&head_history);
     cleanUpDocumentFromPointer(&document->head);
 
+    cleanUpTree(&tree_root);
 
 
 
     free(row);
+    free(nil);
     free(document);
-    free(rowRemoved);
+    free(oldNodes);
+    free(futureNodes);
+
+    //free(tree_root);  // le elimino già con cleanUpTree(&tree_root)
 
 
     return 0;
@@ -414,7 +423,7 @@ int main() {
 // RED BLACK TREE
 tree_pointer createTreeNode(long key, container_pointer* c){
 
-    tree_pointer x = malloc(sizeof(struct TreeNode));
+    tree_pointer x = (tree_pointer)malloc(sizeof(struct TreeNode));
     x->prev = NULL;
     x->left = NULL;
     x->right = NULL;
@@ -688,12 +697,23 @@ tree_pointer treeSearch(tree_pointer* x, long k){
     } else return treeSearch(&(*x)->right, k);
 }
 
+void cleanUpTree(tree_pointer* x){
+
+    if(*x != nil){
+        cleanUpTree(&(*x)->left);
+        cleanUpTree(&(*x)->right);
+
+        free(*x);
+
+    }
+}
+
 
 
 // CREATE NODES
 document_pointer createDocument(){
 
-    document_pointer doc = malloc(sizeof(struct Document));
+    document_pointer doc = (document_pointer)malloc(sizeof(struct Document));
     doc->head = NULL;
     doc->tail = NULL;
 
@@ -701,7 +721,7 @@ document_pointer createDocument(){
 }
 documentRemoved_pointer createDocumentRemoved(){
 
-    documentRemoved_pointer doc = malloc(sizeof(struct DocumentRemoved));
+    documentRemoved_pointer doc = (documentRemoved_pointer)malloc(sizeof(struct DocumentRemoved));
     doc->head = NULL;
     doc->tail = NULL;
 
@@ -709,7 +729,7 @@ documentRemoved_pointer createDocumentRemoved(){
 }
 container_pointer createContainer(){
 
-    container_pointer newNode = malloc(sizeof(struct TextNodeContainer));
+    container_pointer newNode = (container_pointer)malloc(sizeof(struct TextNodeContainer));
 
     newNode->textNode = NULL;
     newNode->prev = NULL;
@@ -740,7 +760,7 @@ history_pointer createHistoryNode(char *x) {
 }
 remove_pointer createRemoveContainer(){
 
-    remove_pointer newNode = malloc(sizeof(struct RemoveContainer));
+    remove_pointer newNode = (remove_pointer)malloc(sizeof(struct RemoveContainer));
 
     newNode->textContainer = NULL;
     newNode->prev = NULL;
@@ -1061,12 +1081,12 @@ int undoChange(document_pointer* document, long num) {
         return 1;
     }
 }
-int undoDelete(document_pointer* document, documentRemoved_pointer* docRem, long index){
+int undoDelete(document_pointer* document, documentRemoved_pointer* oldNodes, documentRemoved_pointer* futureNodes, long index){
 
     // il nodo è stato eliminato, devo rimetterlo nel documento
 
     document_pointer doc = *document;
-    documentRemoved_pointer rowRemoved = *docRem;
+    documentRemoved_pointer rowRemoved = *oldNodes;
 
     remove_pointer r = rowRemoved->tail;
 
@@ -1090,20 +1110,28 @@ int undoDelete(document_pointer* document, documentRemoved_pointer* docRem, long
 
         if(search->tail_textNode == NULL){                  // allora vanno cancellati tutti i vacchi nodi dall'albero
 
-            long index2 = index;
-            long iterator = 0;
-            while (iterator < nodes_in_tree){
-                tree_pointer searchNode = treeSearch(&tree_root, index2);
+            documentRemoved_pointer fut = *futureNodes;
 
-                while(searchNode == nil){
-                    index2++;
-                    searchNode = treeSearch(&tree_root, index2);
+            while (search->tail_textNode == NULL && search != NULL){
+
+                if(fut->head == NULL){
+                    remove_pointer newNode = createRemoveContainer();
+                    newNode->textContainer = search;
+
+                    fut->head = newNode;
+                    fut->tail = newNode;
+                }
+                else{
+                    remove_pointer newNode = createRemoveContainer();
+                    newNode->textContainer = search;
+
+                    fut->tail->next = newNode;
+                    newNode->prev = fut->tail;
+                    fut->tail = newNode;
                 }
 
-                tree_pointer treeNode = treeSearch(&tree_root, index2);
-                rbDelete(&tree_root, &treeNode);
+                search = search->next;
 
-                iterator++;
             }
 
         }
@@ -1168,16 +1196,24 @@ void redoChange(document_pointer* document, long num){
 
 
 }
-int redoDelete(document_pointer* doc, documentRemoved_pointer* docRem, long index){
+int redoDelete(document_pointer* doc, documentRemoved_pointer* oldNodes, documentRemoved_pointer* futureNodes, long index){
 
     // devo tornare a cancellare i nodi che l'undo ha rimesso
 
     document_pointer document = *doc;
-    documentRemoved_pointer rowRemoved = *docRem;
+    documentRemoved_pointer rowRemoved = *oldNodes;
+    documentRemoved_pointer fut = *futureNodes;
 
-    remove_pointer r = rowRemoved->tail;
+    remove_pointer r;
 
-    if(r == NULL){
+    if(fut->head != NULL){
+        r = fut->head;
+    } else{
+        r = rowRemoved->tail;
+    }
+
+
+    if(r == NULL){      // ci finisce solo se fut è vuota
         r = rowRemoved->head;
     }
 
@@ -1250,13 +1286,18 @@ char* getRow(){
     
     row = NULL;
 
-    char* tmp = malloc(sizeof(char) * ROW_LEN);
+    char* tmp = (char *)malloc(sizeof(char) * ROW_LEN);
 
-    fgets(tmp, ROW_LEN, stdin);     // fgets gets '\n' at the end of the string
+    char* res = fgets(tmp, ROW_LEN, stdin);     // fgets gets '\n' at the end of the string
+
+    if (res == NULL) {
+        printf("Failed to read input.\n");
+        return 0;
+    }
 
     unsigned long len = strlen(tmp);
 
-    row = malloc(sizeof(char) * len);
+    row = (char *)malloc(sizeof(char) * len);
 
     strncpy(row, tmp, len);
     strtok(row, "\n");
@@ -1268,7 +1309,7 @@ char* getRow(){
 }
 void getBounds(char* line, long *ind1, long *ind2){
 
-    long *ret = malloc(sizeof(long));
+    long *ret = (long *)malloc(sizeof(long));
 
     *ret = strtol(line, &line, 10);
     line++;
