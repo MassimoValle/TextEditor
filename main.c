@@ -4,7 +4,6 @@
 #include <math.h>
 
 #define ROW_LEN 1024
-#define HASHMAP_DIM 5
 
 typedef struct TextNode* text_pointer;
 typedef struct TextNodeContainer* container_pointer;
@@ -13,7 +12,8 @@ typedef struct HistoryNode* history_pointer;
 typedef struct Document* document_pointer;
 typedef struct DocumentRemoved* documentRemoved_pointer;
 
-typedef struct HashList* hashList_pointer;
+typedef struct TreeNode* tree_pointer;
+
 
 
 struct HistoryNode {
@@ -54,22 +54,24 @@ struct DocumentRemoved {
 };
 
 
-struct HashList{
+struct TreeNode{
+    long key;
     container_pointer value;
-    hashList_pointer prev;
-    hashList_pointer next;
+    tree_pointer prev;
+    tree_pointer left;
+    tree_pointer right;
+
 };
+
 
 history_pointer head_history;
 history_pointer tail_history;
 
 
-char* row;
-hashList_pointer hashmap[HASHMAP_DIM];
+tree_pointer root;
 
-// HASH MAP
-hashList_pointer createHashMapNode(container_pointer* c);
-int hashFunction(int k);
+
+char* row;
 
 // CREATE NODES
 document_pointer createDocument();
@@ -115,9 +117,7 @@ void getBounds(char* line, long *ind1, long *ind2);
 
 int main() {
 
-    for (int i = 0; i < HASHMAP_DIM; ++i) {
-        hashmap[i] = NULL;
-    }
+    
 
     document_pointer document = createDocument();
     documentRemoved_pointer rowRemoved = createDocumentRemoved();
@@ -350,42 +350,6 @@ int main() {
 
 
 
-// HASH
-hashList_pointer createHashMapNode(container_pointer* c){
-
-    hashList_pointer x = malloc(sizeof(struct HashList));
-    x->next = NULL;
-    x->prev = NULL;
-    x->value = *c;
-
-    return x;
-}
-int hashFunction(int k){
-    double A = 0.618;
-
-    double x = k*A;
-
-    double res = remainder(x, 1);
-
-    return abs((int)floor(HASHMAP_DIM*res));
-}
-void addInHashMap(hashList_pointer* hashNode, int index){
-
-    if(hashmap[index] == NULL){
-        hashmap[index] = *hashNode;
-    }
-    else{
-        hashList_pointer next = hashmap[index];
-        while (next->next != NULL){
-            next = next->next;
-        }
-
-        next->next = *hashNode;
-        (*hashNode)->prev = next;
-
-    }
-
-}
 
 
 // CREATE NODES
@@ -479,12 +443,6 @@ void addToDocument(document_pointer* document, char *x, long index){
         doc->tail = c;
 
 
-
-        hashList_pointer hashNode = createHashMapNode(&c);
-        int hashIndex = hashFunction((int) hashNode);
-
-        addInHashMap(&hashNode, hashIndex);
-
     }
     else{
 
@@ -507,12 +465,6 @@ void addToDocument(document_pointer* document, char *x, long index){
             doc->tail->next = c;
             c->prev = doc->tail;
             doc->tail = c;
-
-
-            hashList_pointer hashNode = createHashMapNode(&c);
-            int hashIndex = hashFunction((int) hashNode);
-
-            addInHashMap(&hashNode, hashIndex);
 
         }
 
