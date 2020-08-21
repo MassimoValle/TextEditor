@@ -1,8 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 #define ROW_LEN 1024
+#define HASHMAP_DIM 5
 
 typedef struct TextNode* text_pointer;
 typedef struct TextNodeContainer* container_pointer;
@@ -10,6 +12,8 @@ typedef struct RemoveContainer* remove_pointer;
 typedef struct HistoryNode* history_pointer;
 typedef struct Document* document_pointer;
 typedef struct DocumentRemoved* documentRemoved_pointer;
+
+typedef struct HashList* hashList_pointer;
 
 
 struct HistoryNode {
@@ -49,11 +53,23 @@ struct DocumentRemoved {
     remove_pointer tail;
 };
 
+
+struct HashList{
+    container_pointer value;
+    hashList_pointer prev;
+    hashList_pointer next;
+};
+
 history_pointer head_history;
 history_pointer tail_history;
 
 
 char* row;
+hashList_pointer hashmap[HASHMAP_DIM];
+
+// HASH MAP
+hashList_pointer createHashMapNode(container_pointer* c);
+int hashFunction(int k);
 
 // CREATE NODES
 document_pointer createDocument();
@@ -71,12 +87,16 @@ int removeToDocument(document_pointer* document, documentRemoved_pointer* rowRem
 
 // CLEAN NODES
 void cleanUpDocumentFromPointer(container_pointer* head);
+void cleanUpDocumentRemoved(document_pointer* document, documentRemoved_pointer* docRemoved);
+void cleanUpRemoveContainers(remove_pointer* head);
 void cleanUpTextFromHead(text_pointer* head);
 void cleanUpHistoryFromHead(history_pointer* head);
 void freeUnusedContainerNode(document_pointer* document);
+void freeUnusedRemoveContainer(documentRemoved_pointer* docRem);
 void freeUnusedHistoryNode();
 
 // DB HELPER
+container_pointer listSearch(document_pointer* document, container_pointer* k);
 container_pointer skip(document_pointer* document, long skip);
 void createHeadDocumentRemoved(documentRemoved_pointer* docRem, remove_pointer* c);
 void appendNodeToDocumentRemoved(documentRemoved_pointer* docRem, remove_pointer* c);
@@ -95,6 +115,10 @@ void getBounds(char* line, long *ind1, long *ind2);
 
 int main() {
 
+    for (int i = 0; i < HASHMAP_DIM; ++i) {
+        hashmap[i] = NULL;
+    }
+
     document_pointer document = createDocument();
     documentRemoved_pointer rowRemoved = createDocumentRemoved();
 
@@ -108,8 +132,13 @@ int main() {
         if (strstr(row, "c") != NULL) {
 
             if(undo > 0){
-                freeUnusedHistoryNode();
-                freeUnusedContainerNode(&document);
+
+                if(rowRemoved->head == NULL){
+                    freeUnusedHistoryNode();
+                    freeUnusedContainerNode(&document);
+                } else{
+                    freeUnusedRemoveContainer(&rowRemoved);
+                }
             }
 
             undo = 0;
@@ -141,8 +170,13 @@ int main() {
 
 
             if(undo > 0){
-                freeUnusedHistoryNode();
-                freeUnusedContainerNode(&document);
+
+                if(rowRemoved->head == NULL){
+                    freeUnusedHistoryNode();
+                    freeUnusedContainerNode(&document);
+                } else{
+                    freeUnusedRemoveContainer(&rowRemoved);
+                }
             }
 
             undo = 0;
@@ -180,6 +214,8 @@ int main() {
 
             long ind1, ind2;
             getBounds(row, &ind1, &ind2);
+
+            free(row);
 
 
             if(ind1 == 0){
@@ -297,9 +333,14 @@ int main() {
 
     }
 
-    cleanUpDocumentFromPointer(&document->head);
+    cleanUpDocumentRemoved(&document, &rowRemoved);
     cleanUpHistoryFromHead(&head_history);
+    cleanUpDocumentFromPointer(&document->head);
 
+
+
+
+    free(row);
     free(document);
     free(rowRemoved);
 
@@ -308,6 +349,43 @@ int main() {
 }
 
 
+
+// HASH
+hashList_pointer createHashMapNode(container_pointer* c){
+
+    hashList_pointer x = malloc(sizeof(struct HashList));
+    x->next = NULL;
+    x->prev = NULL;
+    x->value = *c;
+
+    return x;
+}
+int hashFunction(int k){
+    double A = 0.618;
+
+    double x = k*A;
+
+    double res = remainder(x, 1);
+
+    return abs((int)floor(HASHMAP_DIM*res));
+}
+void addInHashMap(hashList_pointer* hashNode, int index){
+
+    if(hashmap[index] == NULL){
+        hashmap[index] = *hashNode;
+    }
+    else{
+        hashList_pointer next = hashmap[index];
+        while (next->next != NULL){
+            next = next->next;
+        }
+
+        next->next = *hashNode;
+        (*hashNode)->prev = next;
+
+    }
+
+}
 
 
 // CREATE NODES
@@ -399,6 +477,14 @@ void addToDocument(document_pointer* document, char *x, long index){
 
         doc->head = c;
         doc->tail = c;
+
+
+
+        hashList_pointer hashNode = createHashMapNode(&c);
+        int hashIndex = hashFunction((int) hashNode);
+
+        addInHashMap(&hashNode, hashIndex);
+
     }
     else{
 
@@ -421,6 +507,12 @@ void addToDocument(document_pointer* document, char *x, long index){
             doc->tail->next = c;
             c->prev = doc->tail;
             doc->tail = c;
+
+
+            hashList_pointer hashNode = createHashMapNode(&c);
+            int hashIndex = hashFunction((int) hashNode);
+
+            addInHashMap(&hashNode, hashIndex);
 
         }
 
@@ -512,6 +604,47 @@ void cleanUpDocumentFromPointer(container_pointer* head){
         bulldozer = nextMiles;
     }
 }
+void cleanUpDocumentRemoved(document_pointer* document, documentRemoved_pointer* docRemoved){
+
+    documentRemoved_pointer docRem = *docRemoved;
+    remove_pointer rem = docRem->head;
+    remove_pointer nextMiles = NULL;
+
+    while (rem != NULL) {
+        if (rem->next != NULL) {
+            nextMiles = rem->next;
+        } else nextMiles = NULL;
+
+
+        if(listSearch(document, &rem->textContainer) == NULL){  // se rem.textnode non è presente rimuovilo
+            cleanUpTextFromHead(&rem->textContainer->textNode);
+            free(rem->textContainer);
+        }
+        free(rem);
+        rem = nextMiles;
+    }
+
+    docRem->head = NULL;
+    docRem->tail = NULL;
+
+}
+void cleanUpRemoveContainers(remove_pointer* head){
+
+    remove_pointer bulldozer = *head;
+    remove_pointer nextMiles = NULL;
+
+    while (bulldozer != NULL) {
+        if (bulldozer->next != NULL) {
+            nextMiles = bulldozer->next;
+        } else nextMiles = NULL;
+        free(bulldozer->command);
+        //cleanUpTextFromHead(&bulldozer->textContainer->textNode);
+        //free(bulldozer->textContainer);
+        free(bulldozer);
+        bulldozer = nextMiles;
+    }
+
+}
 void cleanUpTextFromHead(text_pointer* head){
 
     text_pointer bulldozer = *head;
@@ -557,15 +690,16 @@ void freeUnusedContainerNode(document_pointer* document){
                 c_next = c->next;
             } else c_next = NULL;
 
-            if(c->tail_textNode == NULL){
-                cleanUpTextFromHead(&c->textNode);
-                doc->head = c->next;
+            if(c->tail_textNode->next != NULL){
 
-                if(c->next == NULL){
-                    doc->tail = NULL;
+                cleanUpTextFromHead(&c->tail_textNode->next);
+                c->tail_textNode->next = NULL;
+
+                if(c->textNode == NULL){
+                    doc->head = c->next;
+                    free(c);
                 }
 
-                free(c);
             }
 
             c = c_next;
@@ -574,19 +708,41 @@ void freeUnusedContainerNode(document_pointer* document){
         }
     }
 }
+void freeUnusedRemoveContainer(documentRemoved_pointer* docRem){
+
+    documentRemoved_pointer rowRem = *docRem;
+
+    if(rowRem->tail == NULL){
+        cleanUpRemoveContainers(&rowRem->head);
+        rowRem->head = NULL;
+    }
+    else cleanUpRemoveContainers(&rowRem->tail);
+
+}
 void freeUnusedHistoryNode(){
 
     if(tail_history != NULL && tail_history->next != NULL){
 
         cleanUpHistoryFromHead(&tail_history->next);
+        tail_history->next = NULL;
 
     } else cleanUpHistoryFromHead(&head_history);
 
 }
 
 // DB HELPER
-container_pointer skip(document_pointer* document, long skip){
+container_pointer listSearch(document_pointer* document, container_pointer* k){
 
+    container_pointer x = (*document)->head;
+
+    while (x != NULL && x != *k){
+        x = x->next;
+    }
+
+    return x;
+}
+container_pointer skip(document_pointer* document, long skip){
+    
     document_pointer doc = *document;
 
     container_pointer ret = doc->head;
