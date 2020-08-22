@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <math.h>
 
 #define ROW_LEN 1024
 
@@ -28,27 +27,27 @@ struct TextNode {
     char* value;
     text_pointer next;
     text_pointer prev;
-};
+};              // contains string
 struct TextNodeContainer {
     text_pointer textNode;
     text_pointer tail_textNode;
     container_pointer next;
     container_pointer prev;
-};
+};     // contains text_pointer
 struct RemoveContainer {
     char* command;
     container_pointer textContainer;
     remove_pointer next;
     remove_pointer prev;
-};
+};       // contains command string and container_pointer
 struct Document {
     container_pointer head;
     container_pointer tail;
-};
+};              // contains container_pointer
 struct DocumentRemoved {
     remove_pointer head;
     remove_pointer tail;
-};
+};       // contains remove_pointer
 
 // TREE STRUCT
 enum Color{
@@ -62,12 +61,15 @@ struct TreeNode{
     tree_pointer left;
     tree_pointer right;
 
-};
+};               // contains key and container_pointer
 
 
+// GLOBAL VAR HISTORY
 history_pointer head_history;
 history_pointer tail_history;
 
+
+// GLOBAL VAR TREE
 long nodes_in_tree = 0;
 tree_pointer tree_root;
 tree_pointer nil;
@@ -81,14 +83,14 @@ char* row;
 // RED BLACK TREE
 tree_pointer createTreeNode(long key, container_pointer* c);
 
-void leftRotate(tree_pointer* root, tree_pointer* z);
-void rightRotate(tree_pointer* root, tree_pointer* z);
+void leftRotate(tree_pointer x);
+void rightRotate(tree_pointer x);
 
-void rbInsert(tree_pointer* root, tree_pointer* z);
-void rbInsertFixup(tree_pointer* root, tree_pointer* w);
+void rbInsert(tree_pointer z);
+void rbInsertFixup(tree_pointer z);
 
-void rbDelete(tree_pointer* root, tree_pointer* z);
-void rbDeleteFixup(tree_pointer* root, tree_pointer* x);
+void rbDelete(tree_pointer z);
+void rbDeleteFixup(tree_pointer t);
 
 tree_pointer treeSuccessor(tree_pointer* x);
 tree_pointer treeMinimum(tree_pointer* x);
@@ -96,6 +98,9 @@ tree_pointer treeMinimum(tree_pointer* x);
 tree_pointer treeSearch(tree_pointer* x, long k);
 
 void cleanUpTree(tree_pointer* x);
+
+void pushTreeNodes(long index);
+void pullTreeNodes(long index);
 
 
 
@@ -110,12 +115,12 @@ remove_pointer createRemoveContainer();
 // DB MANAGING
 void addInHistory();
 void addToDocument(document_pointer* document, char *x, long index);
-int removeToDocument(document_pointer* document, documentRemoved_pointer* rowRemoved, container_pointer* headDel, char* command);
+container_pointer removeToDocument(document_pointer* document, documentRemoved_pointer* hell, remove_pointer* hellNode, long treeIndexToRemove);
 
 
 // CLEAN NODES
 void cleanUpDocumentFromPointer(container_pointer* head);
-void cleanUpDocumentRemoved(document_pointer* document, documentRemoved_pointer* docRemoved);
+void cleanUpDocumentRemoved(documentRemoved_pointer* docRemoved);
 void cleanUpRemoveContainers(remove_pointer* head);
 void cleanUpTextFromHead(text_pointer* head);
 void cleanUpHistoryFromHead(history_pointer* head);
@@ -125,11 +130,15 @@ void freeUnusedHistoryNode();
 
 // DB HELPER
 container_pointer listSearch(document_pointer* document, container_pointer* k);
+
+void addToHeaven(documentRemoved_pointer* heaven, container_pointer* c);
+void addToHell(documentRemoved_pointer* hell, remove_pointer* hellNode);
 void createHeadDocumentRemoved(documentRemoved_pointer* docRem, remove_pointer* c);
 void appendNodeToDocumentRemoved(documentRemoved_pointer* docRem, remove_pointer* c);
-int undoChange(document_pointer* document, long num);
+
+int undoChange(long num);
 int undoDelete(document_pointer* document, documentRemoved_pointer* oldNodes, documentRemoved_pointer* futureNodes, long index);
-void redoChange(document_pointer* document, long num);
+void redoChange(long num);
 int redoDelete(document_pointer* doc, documentRemoved_pointer* oldNodes, documentRemoved_pointer* futureNodes, long index);
 
 
@@ -144,38 +153,44 @@ int main() {
 
     nil = (tree_pointer)malloc(sizeof(struct TreeNode));
     nil->color = BLACK;
+    nil->prev = NULL;
+    nil->left = NULL;
+    nil->right = NULL;
+    nil->key = 0;
+    nil->value = NULL;
 
     tree_root = nil;
 
     document_pointer document = createDocument();
-    documentRemoved_pointer oldNodes = createDocumentRemoved();
-    documentRemoved_pointer futureNodes = createDocumentRemoved();
 
-    long undo = 0;
+    documentRemoved_pointer hell = createDocumentRemoved();     // nodi rimossi dalla delete
+    documentRemoved_pointer heaven = createDocumentRemoved();   // nodi rimossi dall'undo
+
+    long undo = 0;      // indica di quante istruzioni si è fatta la undo
 
     row = getRow();
 
     while (strstr(row, "q") == NULL){
 
 
-        if (strstr(row, "c") != NULL) {
+        if (strstr(row, "c") != NULL) {     // modifica o inserimento di righe
 
-            if(undo > 0){
+            if(undo > 0){       // mi serve per la undo/redo
 
-                if(oldNodes->head == NULL){
+                if(hell->head == NULL){
                     freeUnusedHistoryNode();
                     freeUnusedContainerNode(&document);
                 } else{
-                    freeUnusedRemoveContainer(&oldNodes);
+                    freeUnusedRemoveContainer(&hell);
                 }
             }
 
             undo = 0;
-            addInHistory();
+            addInHistory();                     // aggiungo il comando alla cronologia
 
             long ind1 = 0, ind2 = 0;
 
-            getBounds(row, &ind1, &ind2);
+            getBounds(row, &ind1, &ind2);       // prendo gli indici del comando
 
             long numRow = ind2-ind1+1;
 
@@ -185,7 +200,7 @@ int main() {
                 long key = ind1+i;
                 getRow();
 
-                addToDocument(&document, row, key);
+                addToDocument(&document, row, key);     // aggiungo al documento al la stringa(row) all'indice key
             }
 
             getRow();
@@ -195,51 +210,56 @@ int main() {
             } else printf("something went wrong\n");
 
         }
-        else if (strstr(row, "d") != NULL) {
+        else if (strstr(row, "d") != NULL) {         // elimina righe se presenti nel documento
 
 
-            if(undo > 0){
+            if(undo > 0){   // mi serve per la undo/redo
 
-                if(oldNodes->head == NULL){
+                if(hell->head == NULL){
                     freeUnusedHistoryNode();
                     freeUnusedContainerNode(&document);
                 } else{
-                    freeUnusedRemoveContainer(&oldNodes);
+                    freeUnusedRemoveContainer(&hell);
                 }
             }
 
             undo = 0;
-            addInHistory();
+            addInHistory();             // aggiungo il comando alla cronologia
 
             long ind1, ind2;
             getBounds(row, &ind1, &ind2);
 
             long numRow = ind2-ind1+1;
 
-            //container_pointer headDel = skip(&document, ind1);
-            tree_pointer treeNode = treeSearch(&tree_root, ind1);
+            tree_pointer treeNode = treeSearch(&tree_root, ind1);       // cerco il primo nodo da eliminare
 
-            long iterator = 0;
+            /*long iterator = 0;
             while (treeNode == nil && iterator < nodes_in_tree){
                 ind1++;
                 iterator++;
                 treeNode = treeSearch(&tree_root, ind1);
-            }
+            }*/
 
-            container_pointer headDel;
-            if(treeNode != nil){
-                headDel = treeNode->value;
-            } else headDel = NULL;
+            container_pointer listNodeToDelete;
+
+            if(treeNode != nil){                // se esiste allora lo prendo da treeNode
+                listNodeToDelete = treeNode->value;
+            } else listNodeToDelete = NULL;
+
 
             for (int i = 0; i < numRow; i++) {
 
-                int res = removeToDocument(&document, &oldNodes, &headDel, tail_history->value);
-
-                if(res > 0){
-                    tree_pointer delNode = treeSearch(&tree_root, ind1 + i);
-                    rbDelete(&tree_root, &delNode);
-                    free(delNode);
+                if(listNodeToDelete == NULL){   // se non esiste il nodo
+                    continue;
                 }
+
+                remove_pointer hellNode = createRemoveContainer();
+                hellNode->command = tail_history->value;
+                hellNode->textContainer = listNodeToDelete;
+
+                container_pointer nextListNodeToDel = removeToDocument(&document, &hell, &hellNode, ind1);   // rimuovo dal documento il nodo(listNodeToDelete) e lo metto in hell
+
+                listNodeToDelete = nextListNodeToDel;
 
 
                 /*if(ret == 0){
@@ -267,7 +287,7 @@ int main() {
             free(row);
 
 
-            if(ind1 == 0){
+            if(ind2 == 0){
                 printf(".\n");
                 getRow();
                 continue;
@@ -275,16 +295,16 @@ int main() {
             long numRow = ind2-ind1+1;
 
 
-            //container_pointer headPrint = skip(&document, ind1);
             tree_pointer treeNode = treeSearch(&tree_root, ind1);
-            long iterator = 0;
+            /*long iterator = 0;
             while (treeNode == nil && iterator < nodes_in_tree){
                 ind1++;
                 iterator++;
                 treeNode = treeSearch(&tree_root, ind1);
-            }
+            }*/ // usando la pullTreeNode nella delete non serve
 
             container_pointer headPrint;
+
             if(treeNode != nil){
                 headPrint = treeNode->value;
             } else headPrint = NULL;
@@ -325,7 +345,7 @@ int main() {
 
                     if(tail_history->value[3] == 'c'){
 
-                        int val = undoChange(&document, ind1+j);
+                        int val = undoChange(ind1+j);
 
                         if(val == 0){
                             continue;
@@ -334,7 +354,7 @@ int main() {
 
                     } else{
 
-                        int val = undoDelete(&document, &oldNodes, &futureNodes, ind1 + j);
+                        int val = undoDelete(&document, &hell, &heaven, ind1);
 
                         if(val == 0){
                             continue;
@@ -371,11 +391,11 @@ int main() {
 
                         if(tail_history->next->value[3] == 'c'){
 
-                            redoChange(&document, ind1+j);
+                            redoChange(ind1+j);
 
                         } else{
 
-                            redoDelete(&document, &oldNodes, &futureNodes, ind1 + j);
+                            redoDelete(&document, &hell, &heaven, ind1 + j);
 
                         }
 
@@ -397,7 +417,7 @@ int main() {
 
     }
 
-    cleanUpDocumentRemoved(&document, &oldNodes);
+    cleanUpDocumentRemoved(&hell);
     cleanUpHistoryFromHead(&head_history);
     cleanUpDocumentFromPointer(&document->head);
 
@@ -408,8 +428,8 @@ int main() {
     free(row);
     free(nil);
     free(document);
-    free(oldNodes);
-    free(futureNodes);
+    free(hell);
+    free(heaven);
 
     //free(tree_root);  // le elimino già con cleanUpTree(&tree_root)
 
@@ -424,9 +444,9 @@ int main() {
 tree_pointer createTreeNode(long key, container_pointer* c){
 
     tree_pointer x = (tree_pointer)malloc(sizeof(struct TreeNode));
-    x->prev = NULL;
-    x->left = NULL;
-    x->right = NULL;
+    x->prev = nil;
+    x->left = nil;
+    x->right = nil;
     x->color = RED;
 
     x->key = key;
@@ -435,17 +455,19 @@ tree_pointer createTreeNode(long key, container_pointer* c){
     return x;
 }
 
-void leftRotate(tree_pointer* root, tree_pointer* z){
+void leftRotate(tree_pointer x){
 
-    tree_pointer x = *z;
     tree_pointer y = x->right;
     x->right = y->left;
+
     if (y->left != nil){
         y->left->prev = x;
     }
+
     y->prev = x->prev;
+
     if (x->prev == nil){
-        *root = y;
+        tree_root = y;
     }
     else if (x == x->prev->left){
         x->prev->left = y;
@@ -453,21 +475,24 @@ void leftRotate(tree_pointer* root, tree_pointer* z){
     else {
         x->prev->right = y;
     }
+
     y->left = x;
     x->prev = y;
 
 }
-void rightRotate(tree_pointer* root, tree_pointer* z){
+void rightRotate(tree_pointer x){
 
-    tree_pointer x = *z;
     tree_pointer y = x->left;
     x->left = y->right;
+
     if (y->right != nil){
         y->right->prev = x;
     }
+
     y->prev = x->prev;
+
     if (x->prev == nil){
-        *root = y;
+        tree_root = y;
     }
     else if (x == x->prev->left){
         x->prev->left = y;
@@ -475,45 +500,98 @@ void rightRotate(tree_pointer* root, tree_pointer* z){
     else {
         x->prev->right = y;
     }
+
     y->right = x;
     x->prev = y;
 }
 
-void rbInsert(tree_pointer* root, tree_pointer* z){
+void rbInsert(tree_pointer z){
 
     tree_pointer y = nil;
-    tree_pointer x = *root;
+    tree_pointer x = tree_root;
 
     while (x != nil){
         y = x;
-        if((*z)->key < x->key){
+        if(z->key < x->key){
             x = x->left;
         } else{
             x = x->right;
         }
     }
 
-    (*z)->prev = y;
+    z->prev = y;
 
     if(y == nil){
-        *root = *z;
-    } else if((*z)->key < y->key){
-        y->left = *z;
+        tree_root = z;
+    } else if(z->key < y->key){
+        y->left = z;
     } else{
-        y->right = *z;
+        y->right = z;
     }
 
-    (*z)->left = nil;
-    (*z)->right = nil;
-    (*z)->color = RED;
+    z->left = nil;
+    z->right = nil;
+    z->color = RED;
 
-    rbInsertFixup(root, z);
+    rbInsertFixup(z);
 
     nodes_in_tree++;
 
 }
-void rbInsertFixup(tree_pointer* root, tree_pointer* w){
+void rbInsertFixup(tree_pointer z){
 
+    if (z==tree_root){
+        tree_root->color = BLACK;
+    }
+    else {
+        tree_pointer x = z->prev;
+
+        if (x->color==RED){
+            if (x==x->prev->left){
+                tree_pointer y = x->prev->right;
+                if (y->color==RED){
+                    x->color = BLACK;
+                    y->color = BLACK;
+                    x->prev->color = RED;
+                    rbInsertFixup(x->prev);
+                }
+                else {
+                    if (z==x->right){
+                        z = x;
+                        leftRotate(z);
+                        x = z->prev;
+                    }
+                    x->color = BLACK;
+                    x->prev->color = RED;
+                    rightRotate(x->prev);
+
+                }
+            }
+            else {
+                tree_pointer y = x->prev->left;
+                if (y->color==RED){
+                    x->color = BLACK;
+                    y->color = BLACK;
+                    x->prev->color = RED;
+                    rbInsertFixup(x->prev);
+                }
+                else {
+                    if (z==x->left){
+                        z = x;
+                        rightRotate(z);
+                        x = z->prev;
+                    }
+                    x->color = BLACK;
+                    x->prev->color = RED;
+                    leftRotate(x->prev);
+
+                }
+            }
+        }
+    }
+
+
+    /*
     tree_pointer z = *w;
     tree_pointer y, x;
     if (z==*root){
@@ -562,18 +640,20 @@ void rbInsertFixup(tree_pointer* root, tree_pointer* w){
             }
         }
     }
-
+    */
 
 }
 
-void rbDelete(tree_pointer* root, tree_pointer* z){
+void rbDelete(tree_pointer z){
+
+    //!!! y è il nodo da eliminare, x è quello con cui lo sostituiamo
 
     tree_pointer x, y;
 
-    if((*z)->left == nil || (*z)->right == nil){
-        y = *z;
+    if(z->left == nil || z->right == nil){
+        y = z;
     } else{
-        y = treeSuccessor(z);
+        y = treeSuccessor(&z);
     }
 
     if(y->left != nil){
@@ -585,55 +665,131 @@ void rbDelete(tree_pointer* root, tree_pointer* z){
     x->prev = y->prev;
 
     if(y->prev == nil){
-        *root = x;
+        tree_root = x;
     } else if(y == y->prev->left){
         y->prev->left = x;
     } else{
         y->prev->right = x;
     }
 
-    if(y != *z){
-        (*z)->key = y->key;
-        (*z)->value = y->value;
+    if(y != z){
+        z->key = y->key;
+        z->value = y->value;
     }
 
     if(y->color == BLACK){
-        rbDeleteFixup(root, &x);
+        rbDeleteFixup(x);
     }
 
+    free(y);
+
     nodes_in_tree--;
-    //free(*z);
 
 }
-void rbDeleteFixup(tree_pointer* root, tree_pointer* x){
+void rbDeleteFixup(tree_pointer t){
 
+    tree_pointer x = t;
+    tree_pointer w;
+    if (x->color==RED || x->prev==nil){
+        x->color = BLACK;
+    }
+    else if (x == x->prev->left){
+        w = x->prev->right;
+        if (w==nil){
+            rbDeleteFixup(x->prev);
+            return;
+        }
+        if (w->color==RED){
+            w->color = BLACK;
+            x->prev->color = RED;
+            leftRotate(x->prev);
+            w = x->prev->right;
+        }
+        if (w==nil){
+            rbDeleteFixup(x->prev);
+            return;
+        }
+        if (w->left->color==BLACK && w->right->color==RED){
+            w->color = RED;
+            rbDeleteFixup(x->prev);
+        }
+        else {
+            if (w->right->color==BLACK) {
+                w->left->color = BLACK;
+                w->color = RED;
+                rightRotate(w);
+                w = x->prev->right;
+            }
+            w->color = x->prev->color;
+            x->prev->color = BLACK;
+            w->right->color = BLACK;
+            leftRotate(x->prev);
+
+        }
+    }
+    else {
+        w = x->prev->left;
+        if (w==nil){
+            rbDeleteFixup(x->prev);
+            return;
+        }
+        if (w->color==RED){
+            w->color = BLACK;
+            x->prev->color = RED;
+            rightRotate(x->prev);
+            w = x->prev->left;
+        }
+        if (w==nil){
+            rbDeleteFixup(x->prev);
+            return;
+        }
+        if (w->right->color==BLACK && w->left->color==BLACK){
+            w->color = RED;
+            rbDeleteFixup(x->prev);
+        }
+        else {
+            if (w->left->color==BLACK){
+                w->right->color = BLACK;
+                w->color = RED;
+                leftRotate(w);
+                w = x->prev->left;
+            }
+            w->color = x->prev->color;
+            x->prev->color = BLACK;
+            w->left->color = BLACK;
+            rightRotate(x->prev);
+
+        }
+    }
+
+    /*
     if((*x)->color == RED || (*x)->prev == nil){
         (*x)->color = BLACK;
-    } else if(x == &((*x)->prev)->left){
+    } else if(*x == ((*x)->prev)->left){
 
         tree_pointer w = (*x)->prev->right;
 
         if(w->color == RED){
             w->color = BLACK;
             (*x)->prev->color = RED;
-            leftRotate(root, &((*x)->prev));
+            leftRotate(&((*x)->prev));
             w = (*x)->prev->right;
         }
         if(w->left->color == BLACK && w->right->color == BLACK){
             w->color = RED;
-            rbDeleteFixup(root, &((*x)->prev));
+            rbDeleteFixup(&((*x)->prev));
         } else {
             if(w->right->color == BLACK) {
                 w->left->color = BLACK;
                 w->color = RED;
-                rightRotate(root, &w);
+                rightRotate(&w);
                 w = (*x)->prev->right;
             }
 
             w->color = (*x)->prev->color;
             (*x)->prev->color = BLACK;
             w->right->color = BLACK;
-            leftRotate(root, &((*x)->prev));
+            leftRotate(&((*x)->prev));
         }
     } else{
 
@@ -642,27 +798,28 @@ void rbDeleteFixup(tree_pointer* root, tree_pointer* x){
         if(w->color == RED){
             w->color = BLACK;
             (*x)->prev->color = RED;
-            rightRotate(root, &((*x)->prev));
+            rightRotate(&((*x)->prev));
             w = (*x)->prev->left;
         }
-        if(w->right->color == BLACK && w->left->color == BLACK){
+        if(w->right->color == BLACK && w->left->color == BLACK){    // ECCEZIONE: W è nil
             w->color = RED;
-            rbDeleteFixup(root, &((*x)->prev));
+            rbDeleteFixup(&((*x)->prev));
         } else {
             if(w->left->color == BLACK) {
                 w->right->color = BLACK;
                 w->color = RED;
-                leftRotate(root, &w);
+                leftRotate(&w);
                 w = (*x)->prev->left;
             }
 
             w->color = (*x)->prev->color;
             (*x)->prev->color = BLACK;
             w->left->color = BLACK;
-            rightRotate(root, &((*x)->prev));
+            rightRotate(&((*x)->prev));
         }
 
     }
+     */
 
 }
 
@@ -696,6 +853,22 @@ tree_pointer treeSearch(tree_pointer* x, long k){
         return treeSearch(&(*x)->left, k);
     } else return treeSearch(&(*x)->right, k);
 }
+tree_pointer treeSearchByContainer(tree_pointer* x, container_pointer* k){
+
+    container_pointer container = *k;
+    tree_pointer ret;
+
+    if(*x == nil || container == (*x)->value){
+        return *x;
+    }
+
+    ret = treeSearchByContainer(&(*x)->left, &container);
+
+    if(ret != nil) return ret;
+    else{
+        return treeSearchByContainer(&(*x)->right, &container);
+    }
+}
 
 void cleanUpTree(tree_pointer* x){
 
@@ -706,6 +879,35 @@ void cleanUpTree(tree_pointer* x){
         free(*x);
 
     }
+}
+
+void pushTreeNodes(long index){
+
+    tree_pointer searchNode = treeSearch(&tree_root, index);
+    tree_pointer searchNode_next = searchNode;
+    long iterator = 0;
+    while(searchNode_next != nil && iterator < nodes_in_tree){
+        searchNode_next = treeSearch(&tree_root, index+iterator+1);
+        searchNode->key++;
+        iterator++;
+        searchNode = searchNode_next;
+        //searchNode = treeSuccessor(&searchNode);
+    }
+
+}
+void pullTreeNodes(long index){
+
+    tree_pointer searchNode = treeSearch(&tree_root, index);
+    tree_pointer searchNode_next = searchNode;
+    long iterator = 0;
+    while(searchNode_next != nil && iterator < nodes_in_tree){
+        searchNode_next = treeSearch(&tree_root, index+iterator+1);
+        searchNode->key--;
+        iterator++;
+        searchNode = searchNode_next;
+        //searchNode = treeSuccessor(&searchNode);
+    }
+
 }
 
 
@@ -775,21 +977,23 @@ void addInHistory() {
 
     history_pointer newNode = createHistoryNode(row);
 
-    if(tail_history == NULL){
+    if(tail_history == NULL){       // se è il primo nodo della cronologia lo aggingo in testa
         head_history = newNode;
         tail_history = newNode;
-        return;
     }
 
-    tail_history->next = newNode;
-    newNode->prev = tail_history;
-    tail_history = newNode;
+    else{                                   // altrimento lo aggiungo in coda
+        tail_history->next = newNode;
+        newNode->prev = tail_history;
+        tail_history = newNode;
+    }
+
 }
 void addToDocument(document_pointer* document, char *x, long index){
 
     document_pointer doc = *document;
 
-    if(doc->head == NULL || doc->tail == NULL){     // se è il primo nodo
+    if(doc->head == NULL || doc->tail == NULL){     // se il documento è vuoto
 
         text_pointer n = createTextNode(x);
         container_pointer c = createContainer();
@@ -797,28 +1001,26 @@ void addToDocument(document_pointer* document, char *x, long index){
         c->tail_textNode = n;
 
 
-        doc->head = c;
+        doc->head = c;                                      // metto il nodo come primo e ultimo elemento della linked list
         doc->tail = c;
 
         tree_pointer node = createTreeNode(index, &c);
-        rbInsert(&tree_root, &node);
+        rbInsert(node);                                     // aggiungo il nodo anche all'albero
 
 
     }
     else{
 
-        //container_pointer y = skip(document, index);
-        tree_pointer  treeNode = treeSearch(&tree_root, index);
+        tree_pointer  treeNode = treeSearch(&tree_root, index);     // cerco se esiste già una stringa a quella riga
         container_pointer y = treeNode->value;
 
-        if(treeNode != nil && y != NULL){  // cambia il valore in coda a textNode
+        if(treeNode != nil && y != NULL){           // se c'è, aggiungo il valore in coda a textNode
             text_pointer n = createTextNode(x);
             y->tail_textNode->next = n;
             n->prev = y->tail_textNode;
             y->tail_textNode = n;
         }
-        else{
-            // inserisci nuovo nodo in coda al documento
+        else{       // se non c'è, inserisci nuovo nodo in coda al documento
 
             text_pointer n = createTextNode(x);
             container_pointer c = createContainer();
@@ -830,43 +1032,29 @@ void addToDocument(document_pointer* document, char *x, long index){
             doc->tail = c;
 
             tree_pointer node = createTreeNode(index, &c);
-            rbInsert(&tree_root, &node);
+            rbInsert(node);                                 // aggiungo il nodo anche all'albero
 
         }
 
 
     }
 }
-int removeToDocument(document_pointer* document, documentRemoved_pointer* rowRemoved, container_pointer* headDel, char* command){
+container_pointer removeToDocument(document_pointer* document, documentRemoved_pointer* hell, remove_pointer* hellNode, long treeIndexToRemove){
 
-    if(*headDel == NULL){   // se non esiste il nodo
-        return 0;
-    }
-
-    document_pointer doc = *document;
-    documentRemoved_pointer docRem = *rowRemoved;
-    container_pointer del = *headDel;
+    document_pointer _document = *document;
+    container_pointer del = (*hellNode)->textContainer;     // container da rimuovere
 
 
     if(del->prev != NULL){      // se non sto rimuovendo la testa del documento
 
-        remove_pointer c = createRemoveContainer();
-        c->command = command;
-        c->textContainer = del;
 
-        if(docRem->head == NULL || docRem->tail==NULL){     // se è il primo nodo dei rimossi
-           createHeadDocumentRemoved(rowRemoved, &c);
-
-        } else{     // altrimenti lo aggiungo in coda
-
-            appendNodeToDocumentRemoved(rowRemoved, &c);
-        }
+        addToHell(hell, hellNode);
 
         // faccio il link tra i vicini del nodo rimosso
         del->prev->next = del->next;
 
         if(del->next == NULL) {     // se ho rimosso la coda del documento
-            doc->tail = del->prev;
+            _document->tail = del->prev;
         } else{                             // altrimenti completo il link normalmente
             del->next->prev = del->prev;
         }
@@ -874,37 +1062,31 @@ int removeToDocument(document_pointer* document, documentRemoved_pointer* rowRem
 
     } else{     // se sto rimuovendo la testa del documento
 
-        remove_pointer c = createRemoveContainer();
-        c->command = command;
-        c->textContainer = del;
 
-        if(docRem->head == NULL || docRem->tail==NULL){   // quando cazzo ci capito qui???
-
-            createHeadDocumentRemoved(rowRemoved, &c);
-        } else{
-
-            appendNodeToDocumentRemoved(rowRemoved, &c);
-        }
+        addToHell(hell, hellNode);
 
 
         if(del->next == NULL){  // se ho cancellato l'unico nodo del documento
 
-            doc->head = NULL;
-            doc->tail = NULL;
+            _document->head = NULL;
+            _document->tail = NULL;
         } else{
 
             del->next->prev = NULL;
-            doc->head = del->next;
+            _document->head = del->next;
         }
     }
 
 
-    del = del->next;
-    *headDel = del;
+    // ora devo rimuovere il nodo anche dall'albero
 
-    return 1;
+    tree_pointer delNode = treeSearch(&tree_root, treeIndexToRemove);   // poichè è tipo una torre, cancello sempre lo stesso indice e gli altri cadono di 1 tramitr la pullTreeNodes
+    rbDelete(delNode);
+
+    pullTreeNodes(treeIndexToRemove+1);     // partendo dal nodo di indice successivo a quello cancellato, decremento le key di 1
+
+    return del->next;
 }
-
 
 // CLEAN NODES
 void cleanUpDocumentFromPointer(container_pointer* head){
@@ -922,7 +1104,7 @@ void cleanUpDocumentFromPointer(container_pointer* head){
         bulldozer = nextMiles;
     }
 }
-void cleanUpDocumentRemoved(document_pointer* document, documentRemoved_pointer* docRemoved){
+void cleanUpDocumentRemoved(documentRemoved_pointer* docRemoved){
 
     documentRemoved_pointer docRem = *docRemoved;
     remove_pointer rem = docRem->head;
@@ -933,8 +1115,9 @@ void cleanUpDocumentRemoved(document_pointer* document, documentRemoved_pointer*
             nextMiles = rem->next;
         } else nextMiles = NULL;
 
-
-        if(listSearch(document, &rem->textContainer) == NULL){  // se rem.textnode non è presente rimuovilo
+        ;
+        //if(listSearch(document, &rem->textContainer) == NULL){  // se rem.textnode non è presente rimuovilo
+        if(treeSearchByContainer(&tree_root, &rem->textContainer) == nil){
             cleanUpTextFromHead(&rem->textContainer->textNode);
             free(rem->textContainer);
         }
@@ -1059,6 +1242,45 @@ container_pointer listSearch(document_pointer* document, container_pointer* k){
 
     return x;
 }
+
+void addToHeaven(documentRemoved_pointer* heaven, container_pointer* c){
+
+    documentRemoved_pointer fut = *heaven;
+    container_pointer search = *c;
+
+    if(search->tail_textNode == NULL){
+
+        if(fut->head == NULL){
+            remove_pointer newNode = createRemoveContainer();
+            newNode->textContainer = search;
+
+            fut->head = newNode;
+            fut->tail = newNode;
+        }
+        else{
+            remove_pointer newNode = createRemoveContainer();
+            newNode->textContainer = search;
+
+            fut->tail->next = newNode;
+            newNode->prev = fut->tail;
+            fut->tail = newNode;
+        }
+
+    }
+}
+void addToHell(documentRemoved_pointer* hell, remove_pointer* hellNode){
+
+    documentRemoved_pointer _hell = *hell;
+
+    if(_hell->head == NULL || _hell->tail == NULL){     // se è il primo nodo dei rimossi
+        createHeadDocumentRemoved(hell, hellNode);
+
+    } else{     // altrimenti lo aggiungo in coda
+
+        appendNodeToDocumentRemoved(hell, hellNode);
+    }
+
+}
 void createHeadDocumentRemoved(documentRemoved_pointer* docRem, remove_pointer* c){
     (*docRem)->head = *c;
     (*docRem)->tail = *c;
@@ -1068,7 +1290,8 @@ void appendNodeToDocumentRemoved(documentRemoved_pointer* docRem, remove_pointer
     (*c)->prev = (*docRem)->tail;
     (*docRem)->tail = *c;
 }
-int undoChange(document_pointer* document, long num) {
+
+int undoChange(long num) {
 
     //container_pointer c = skip(document, num);
     tree_pointer treeNode = treeSearch(&tree_root, num);
@@ -1086,14 +1309,14 @@ int undoDelete(document_pointer* document, documentRemoved_pointer* oldNodes, do
     // il nodo è stato eliminato, devo rimetterlo nel documento
 
     document_pointer doc = *document;
-    documentRemoved_pointer rowRemoved = *oldNodes;
+    documentRemoved_pointer hell = *oldNodes;
 
-    remove_pointer r = rowRemoved->tail;
+    remove_pointer r = hell->tail;
 
 
     if(r == NULL) return 0;
 
-    while (r->command != tail_history->value){
+    while (r->command != tail_history->value){      // teoricamente è sempre la coda, ma confronta il comando con cui ho eliminato il nodo con quello della history
 
         if(r->prev == NULL){                    // voglio fare l'undo e ?
             return 0;
@@ -1104,43 +1327,31 @@ int undoDelete(document_pointer* document, documentRemoved_pointer* oldNodes, do
     container_pointer c = r->textContainer;
     container_pointer search = doc->head;
 
-    if(search == NULL || search->tail_textNode == NULL){     // se il documento è vuoto e quindi devo inserire la testa
+    if(search == NULL || search->tail_textNode == NULL){     // se il documento è vuoto e quindi devo inserire la testa (compreso il caso in cui ci sono nodi oscurati)
         doc->head = c;
         doc->tail = c;
 
-        if(search->tail_textNode == NULL){                  // allora vanno cancellati tutti i vacchi nodi dall'albero
+        while (search != NULL){     // vuol dire che ci sono solo nodi oscurati
 
-            documentRemoved_pointer fut = *futureNodes;
+            if(search->tail_textNode == NULL){                  // allora vanno cancellati tutti i vacchi nodi dall'albero
 
-            while (search->tail_textNode == NULL && search != NULL){
+                documentRemoved_pointer fut = *futureNodes;
 
-                if(fut->head == NULL){
-                    remove_pointer newNode = createRemoveContainer();
-                    newNode->textContainer = search;
-
-                    fut->head = newNode;
-                    fut->tail = newNode;
-                }
-                else{
-                    remove_pointer newNode = createRemoveContainer();
-                    newNode->textContainer = search;
-
-                    fut->tail->next = newNode;
-                    newNode->prev = fut->tail;
-                    fut->tail = newNode;
-                }
+                addToHeaven(&fut, &search);                                 // aggiungo il nodo oscurato ad heaven
+                rbDelete(treeSearchByContainer(&tree_root, &search));       // rimuovo il nodo oscurato dall'albero
 
                 search = search->next;
 
             }
-
         }
+
+
 
     } else{                 // se il documento ha già dei nodi
 
         container_pointer search_prev = search;
-        while (c->next != search){    // skippo avanti finchè non trovo il nodo a cui devo inserire in prev il nodo c
-
+        while (c->next != search){    // skippo avanti finchè non trovo il nodo a cui devo inserire in prev il nodo c,
+                                            // quindi search è il nodo successivo. Per questo motivo mi serve search_prev nel caso che non ci sia il successivo
             if(search->next != NULL) {
                 search_prev = search->next;
             }
@@ -1168,23 +1379,18 @@ int undoDelete(document_pointer* document, documentRemoved_pointer* oldNodes, do
 
     }
 
-    rowRemoved->tail = rowRemoved->tail->prev;  // porto indietro la coda poichè ho aggiunto quest'ultima al documento
+    hell->tail = hell->tail->prev;  // porto indietro la coda poichè ho aggiunto quest'ultima al documento
 
 
-    tree_pointer searchNode = treeSearch(&tree_root, index);
-    while(searchNode != nil){
-        searchNode->key++;
-        searchNode = treeSearch(&tree_root, index);
-    }
+    pushTreeNodes(index);       // incremento di 1 tutte le chiavi dei nodi da index in poi
 
     tree_pointer treeNode = createTreeNode(index, &c);
-    rbInsert(&tree_root, &treeNode);
-
+    rbInsert(treeNode);
 
     return 1;
 
 }
-void redoChange(document_pointer* document, long num){
+void redoChange(long num){
 
     //container_pointer c = skip(document, num);
     tree_pointer treeNode = treeSearch(&tree_root, num);
@@ -1274,7 +1480,7 @@ int redoDelete(document_pointer* doc, documentRemoved_pointer* oldNodes, documen
     }
 
     tree_pointer treeNode = treeSearch(&tree_root, index);
-    rbDelete(&tree_root, &treeNode);
+    rbDelete(treeNode);
 
     return 1;
 
