@@ -93,7 +93,9 @@ void rbDelete(tree_pointer z);
 void rbDeleteFixup(tree_pointer t);
 
 tree_pointer treeSuccessor(tree_pointer* x);
+tree_pointer treePredecessor(tree_pointer* x);
 tree_pointer treeMinimum(tree_pointer* x);
+tree_pointer treeMaximum(tree_pointer* x);
 
 tree_pointer treeSearch(tree_pointer* x, long k);
 
@@ -868,9 +870,28 @@ tree_pointer treeSuccessor(tree_pointer* x){
 
     return y;
 }
+tree_pointer treePredecessor(tree_pointer* x){
+
+    if ((*x)->left != nil){
+        return treeMaximum(&(*x)->left);
+    }
+    tree_pointer y = (*x)->prev;
+
+    while (y!=nil && ((*x) == y->left)){
+        *x = y;
+        y = y->prev;
+    }
+    return y;
+}
 tree_pointer treeMinimum(tree_pointer* x){
     while ((*x)->left != nil){
         *x = (*x)->left;
+    }
+    return *x;
+}
+tree_pointer treeMaximum(tree_pointer* x){
+    while ((*x)->right != nil){
+        *x = (*x)->right;
     }
     return *x;
 }
@@ -1422,7 +1443,7 @@ int undoDelete(document_pointer* document, documentRemoved_pointer* oldNodes, do
 
     } else{                 // se il documento ha già dei nodi
 
-        container_pointer search_prev = search;
+        /*container_pointer search_prev = search;
         while (c->next != search){    // skippo avanti finchè non trovo il nodo a cui devo inserire in prev il nodo c,
                                             // quindi search è il nodo successivo. Per questo motivo mi serve search_prev nel caso che non ci sia il successivo
             if(search->next != NULL) {
@@ -1430,7 +1451,29 @@ int undoDelete(document_pointer* document, documentRemoved_pointer* oldNodes, do
             }
 
             search = search->next;
+        }*/
+        /*
+        tree_pointer searchTreeNode = treeSearch(&tree_root, index);
+        tree_pointer searchTreeNode_prev = treePredecessor(&searchTreeNode);
+
+        if(searchTreeNode != nil){
+            search = searchTreeNode->value;
+
+        } else{
+            searchTreeNode_prev = treeSearch(&tree_root, index-1);
+            search = NULL;
         }
+
+        container_pointer search_prev;
+
+        if(searchTreeNode_prev != nil){
+            search_prev = searchTreeNode_prev->value;
+        } else{
+            search_prev = NULL;
+        }
+        */
+
+        container_pointer search_prev = NULL;
 
         if(search == NULL){             // se devo inserire il nodo in coda
             search_prev->next = c;
@@ -1571,7 +1614,7 @@ int redoDelete(document_pointer* document, documentRemoved_pointer* hell, long t
     container_pointer c = r->textContainer;  // c è il nodo da rimuovere nel documento
 
     // teoricamente non serve fare sta cosa con il search perchè da c sò già chi lo procede e chi lo segue
-    container_pointer search = _document->head; // search mi serve per sapere chi lo procede e chi lo segue
+    /*container_pointer search = _document->head; // search mi serve per sapere chi lo procede e chi lo segue
 
     container_pointer search_prev = search;
     while (c->next != search){    // skippo avanti finchè non trovo il nodo a cui devo rimuovere in prev il nodo c,
@@ -1581,8 +1624,11 @@ int redoDelete(document_pointer* document, documentRemoved_pointer* hell, long t
         }
 
         search = search->next;
-    }
+    }*/
 
+
+    container_pointer search = c->next;
+    container_pointer search_prev = c->next->prev;
 
 
     if(search->next == NULL && search->prev == NULL){       // se il documento contiene un solo nodo
