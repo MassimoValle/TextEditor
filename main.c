@@ -937,27 +937,32 @@ void pushTreeNodes(long index){
 
     tree_pointer searchNode = treeSearch(&tree_root, index);
     tree_pointer searchNode_next = searchNode;
-    long iterator = 0;
-    while(searchNode_next != nil && iterator < nodes_in_tree){
-        searchNode_next = treeSearch(&tree_root, index+iterator+1);
+
+    while(searchNode != nil){
+
+        searchNode_next = treeSuccessor(&searchNode_next);
+
         searchNode->key++;
-        iterator++;
+
         searchNode = searchNode_next;
-        //searchNode = treeSuccessor(&searchNode);
+
     }
+
 
 }
 void pullTreeNodes(long index){
 
     tree_pointer searchNode = treeSearch(&tree_root, index);
     tree_pointer searchNode_next = searchNode;
-    long iterator = 0;
-    while(searchNode_next != nil && iterator < nodes_in_tree){
-        searchNode_next = treeSearch(&tree_root, index+iterator+1);
+
+    while(searchNode != nil){
+
+        searchNode_next = treeSuccessor(&searchNode_next);
+
         searchNode->key--;
-        iterator++;
+
         searchNode = searchNode_next;
-        //searchNode = treeSuccessor(&searchNode);
+
     }
 
 }
