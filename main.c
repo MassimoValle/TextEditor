@@ -386,9 +386,9 @@ int main() {
 
     cleanUpHell(&hell);
     cleanUpHeaven(&heaven);
-    cleanUpHistoryFromHead(&head_history);
 
     cleanUpTree(&tree_root);
+    cleanUpHistoryFromHead(&head_history);
 
 
 
@@ -735,20 +735,6 @@ tree_pointer treeSearchByContainer(tree_pointer* x, container_pointer* k){
     }
 }
 
-void cleanUpTree(tree_pointer* x){
-
-    if(*x != nil){
-        cleanUpTree(&(*x)->left);
-        cleanUpTree(&(*x)->right);
-
-        cleanUpTextFromHead(&(*x)->value->textNode);
-        free((*x)->value);
-        free(*x);
-
-
-    }
-}
-
 void pushTreeNodes(long index){
 
     tree_pointer searchNode = treeSearch(&tree_root, index);
@@ -957,7 +943,9 @@ int undoDelete(documentRemoved_pointer* hell, documentRemoved_pointer* heaven, l
     }
 
 
-    _hell->tail = _hell->tail->prev;  // porto indietro la coda poichè ho aggiunto quest'ultima al documento
+    if(_hell->tail != NULL){
+        _hell->tail = _hell->tail->prev;  // porto indietro la coda poichè ho aggiunto quest'ultima al documento
+    } else _hell->tail = _hell->head;
 
 
     pushTreeNodes(index);       // incremento di 1 tutte le chiavi dei nodi da index in poi
@@ -1029,18 +1017,17 @@ int redoDelete(documentRemoved_pointer* hell, long treeIndexToRemove){
         r = r->next;
     }
 
-    // porto avanti la coda poichè ho rimosso quest'ultima al documento
-    if(_hell->tail == NULL){
-        _hell->tail = _hell->head;
-    } else{
-        _hell->tail = _hell->tail->next;
-    }
-
-
 
     tree_pointer delNode = treeSearch(&tree_root, treeIndexToRemove);   // poichè è tipo una torre, cancello sempre lo stesso indice e gli altri cadono di 1 tramitr la pullTreeNodes
 
     if(delNode != nil){     // caso in cui rifaccio la delete di un nodo che non esiste
+
+        // porto avanti la coda poichè ho rimosso quest'ultima al documento
+        if(_hell->tail == NULL){
+            _hell->tail = _hell->head;
+        } else{
+            _hell->tail = _hell->tail->next;
+        }
 
         rbDelete(delNode);
         pullTreeNodes(treeIndexToRemove + 1);     // partendo dal nodo di indice successivo a quello cancellato, decremento le key di 1
@@ -1052,6 +1039,30 @@ int redoDelete(documentRemoved_pointer* hell, long treeIndexToRemove){
 }
 
 // CLEAN NODES
+void cleanUpTree(tree_pointer* x){
+
+    if(*x != nil){
+        cleanUpTree(&(*x)->left);
+        cleanUpTree(&(*x)->right);
+
+        if((*x)->value->textNode != NULL){
+            cleanUpTextFromHead(&(*x)->value->textNode);
+            (*x)->value->textNode = NULL;
+        }
+
+        if((*x)->value != NULL){
+
+            free((*x)->value);
+            (*x)->value = NULL;
+
+        }
+
+
+        free(*x);
+
+
+    }
+}
 void cleanUpHell(documentRemoved_pointer* hell){
 
     documentRemoved_pointer _hell = *hell;
@@ -1063,10 +1074,25 @@ void cleanUpHell(documentRemoved_pointer* hell){
             nextMiles = rem->next;
         } else nextMiles = NULL;
 
-        if(treeSearchByContainer(&tree_root, &rem->textContainer) == nil){
-            cleanUpTextFromHead(&rem->textContainer->textNode);
-            free(rem->textContainer);
+
+        if(rem->textContainer != NULL){
+
+            if(rem->textContainer->textNode != NULL){
+
+                cleanUpTextFromHead(&rem->textContainer->textNode);
+                rem->textContainer->textNode = NULL;
+
+            }
+
+            if( treeSearchByContainer(&tree_root, &rem->textContainer) == nil ){
+
+                free(rem->textContainer);
+                rem->textContainer = NULL;
+            }
+
+
         }
+
         free(rem);
         rem = nextMiles;
     }
@@ -1089,10 +1115,22 @@ void cleanUpHeaven(documentRemoved_pointer* heaven){
                 nextMiles = rem->prev;
             } else nextMiles = NULL;
 
-            /*if(treeSearchByContainer(&tree_root, &rem->textContainer) == nil){
-                cleanUpTextFromHead(&rem->textContainer->textNode);
-                free(rem->textContainer);
-            }*/
+
+            if(rem->textContainer != NULL){
+
+                /*if(rem->textContainer->textNode != NULL){
+
+                    cleanUpTextFromHead(&rem->textContainer->textNode);
+                    rem->textContainer->textNode = NULL;
+
+                }*/
+
+                //free(rem->textContainer);
+                rem->textContainer = NULL;
+
+            }
+
+
             free(rem);
             rem = nextMiles;
         }
@@ -1112,7 +1150,14 @@ void cleanUpTextFromHead(text_pointer* head){
         if (bulldozer->next != NULL) {
             nextMiles = bulldozer->next;
         } else nextMiles = NULL;
-        free(bulldozer->value);
+
+        if(bulldozer->value != NULL){
+
+            free(bulldozer->value);
+            bulldozer->value = NULL;
+
+        }
+
         free(bulldozer);
         bulldozer = nextMiles;
     }
@@ -1126,7 +1171,14 @@ void cleanUpHistoryFromHead(history_pointer* head){
         if (bulldozer->next != NULL) {
             nextMiles = bulldozer->next;
         } else nextMiles = NULL;
-        free(bulldozer->value);
+
+        if(bulldozer->value != NULL){
+
+            free(bulldozer->value);
+            bulldozer->value = NULL;
+
+        }
+
         free(bulldozer);
         bulldozer = nextMiles;
     }
@@ -1144,7 +1196,17 @@ void freeUnusedHellContainer(documentRemoved_pointer* hell){
         } else nextMiles = NULL;
 
         //free(bulldozer->command);
-        cleanUpTextFromHead(&bulldozer->textContainer->textNode);
+        if(bulldozer->textContainer->textNode != NULL){
+
+            cleanUpTextFromHead(&bulldozer->textContainer->textNode);
+            bulldozer->textContainer->textNode = NULL;
+
+        }
+
+
+        //free(bulldozer->textContainer);
+        bulldozer->textContainer = NULL;
+
         free(bulldozer);
         bulldozer = nextMiles;
     }
@@ -1165,8 +1227,16 @@ void freeUnusedHeavenContainer(documentRemoved_pointer* heaven){
             nextMiles = bulldozer->prev;
         } else nextMiles = NULL;
         //free(bulldozer->command);
-        cleanUpTextFromHead(&bulldozer->textContainer->textNode);
+        if(bulldozer->textContainer->textNode != NULL) {
+
+            cleanUpTextFromHead(&bulldozer->textContainer->textNode);
+            bulldozer->textContainer->textNode = NULL;
+
+        }
+
         //free(bulldozer->textContainer);
+        bulldozer->textContainer = NULL;
+
         free(bulldozer);
         bulldozer = nextMiles;
     }
