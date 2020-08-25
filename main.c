@@ -894,38 +894,18 @@ int undoDelete(documentRemoved_pointer* hell, documentRemoved_pointer* heaven, l
 
     documentRemoved_pointer _hell = *hell;
 
-    remove_pointer r = _hell->tail;
+    remove_pointer r;
 
 
-    if(r == NULL){      // ci finisce solo se tail è null
+    if(_hell->tail == NULL) {
         r = _hell->head;
-
-        if( r->command != tail_history->value ){
-            return 0;
-        }
-
-        /*while (r->command != tail_history->value){      // teoricamente è sempre la coda, ma confronta il comando con cui ho eliminato il nodo con quello della history
-
-            if(r->next == NULL){                    // voglio fare l'undo e ?
-                return 0;
-            }
-            r = r->next;
-        }*/
-
     } else{
+        r = _hell->tail;
+    }
 
-        if( r->command != tail_history->value ){
-            return 0;
-        }
 
-        /*while (r->command != tail_history->value){      // teoricamente è sempre la coda, ma confronta il comando con cui ho eliminato il nodo con quello della history
-
-            if(r->prev == NULL){                    // voglio fare l'undo e ?
-                return 0;
-            }
-            r = r->prev;
-        }*/
-
+    if( r->command != tail_history->value ){
+        return 0;
     }
 
 
@@ -939,14 +919,12 @@ int undoDelete(documentRemoved_pointer* hell, documentRemoved_pointer* heaven, l
 
         if(search->tail_textNode == NULL){     // se il documento è vuoto e quindi devo inserire la testa (compreso il caso in cui ci sono nodi oscurati)
                                                 // allora vanno cancellati tutti i vacchi nodi dall'albero
-
             documentRemoved_pointer _heaven = *heaven;
 
             addToHeaven(&_heaven, &search);                                 // aggiungo il nodo oscurato ad heaven
             rbDelete(treeSearchByContainer(&tree_root, &search));       // rimuovo il nodo oscurato dall'albero
 
         }
-
 
     }
 
@@ -966,7 +944,6 @@ int undoDelete(documentRemoved_pointer* hell, documentRemoved_pointer* heaven, l
 }
 void redoChange(long num, documentRemoved_pointer* heaven){
 
-
     if(tree_root->value == NULL){     // se il documento è vuoto
 
         addFormHeaven(heaven, num);
@@ -975,7 +952,6 @@ void redoChange(long num, documentRemoved_pointer* heaven){
     else{
 
         tree_pointer treeNode = treeSearch(&tree_root, num);
-
 
         if(treeNode != nil){
 
@@ -1001,9 +977,6 @@ void redoChange(long num, documentRemoved_pointer* heaven){
 
     }
 
-
-
-
 }
 int redoDelete(documentRemoved_pointer* hell, long treeIndexToRemove){
 
@@ -1011,18 +984,16 @@ int redoDelete(documentRemoved_pointer* hell, long treeIndexToRemove){
 
     documentRemoved_pointer _hell = *hell;
 
-    remove_pointer r = _hell->tail;
+    remove_pointer r;
 
-    if(r == NULL){      // ci finisce solo se tail è null
+    if(_hell->tail == NULL){      // ci finisce solo se tail è null
         r = _hell->head;
+    } else{
+        r = _hell->tail->next;
     }
 
-    while (r->command != tail_history->next->value){    // va sempre avanti di 1
-
-        if(r->next == NULL){                    // voglio fare la redo e ?
-            return 0;
-        }
-        r = r->next;
+    if( r->command != tail_history->next->value ){
+        return 0;
     }
 
 
