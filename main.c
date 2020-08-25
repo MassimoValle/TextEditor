@@ -900,23 +900,31 @@ int undoDelete(documentRemoved_pointer* hell, documentRemoved_pointer* heaven, l
     if(r == NULL){      // ci finisce solo se tail è null
         r = _hell->head;
 
-        while (r->command != tail_history->value){      // teoricamente è sempre la coda, ma confronta il comando con cui ho eliminato il nodo con quello della history
+        if( r->command != tail_history->value ){
+            return 0;
+        }
+
+        /*while (r->command != tail_history->value){      // teoricamente è sempre la coda, ma confronta il comando con cui ho eliminato il nodo con quello della history
 
             if(r->next == NULL){                    // voglio fare l'undo e ?
                 return 0;
             }
             r = r->next;
-        }
+        }*/
 
     } else{
 
-        while (r->command != tail_history->value){      // teoricamente è sempre la coda, ma confronta il comando con cui ho eliminato il nodo con quello della history
+        if( r->command != tail_history->value ){
+            return 0;
+        }
+
+        /*while (r->command != tail_history->value){      // teoricamente è sempre la coda, ma confronta il comando con cui ho eliminato il nodo con quello della history
 
             if(r->prev == NULL){                    // voglio fare l'undo e ?
                 return 0;
             }
             r = r->prev;
-        }
+        }*/
 
     }
 
@@ -1009,7 +1017,7 @@ int redoDelete(documentRemoved_pointer* hell, long treeIndexToRemove){
         r = _hell->head;
     }
 
-    while (r->command != tail_history->next->value){
+    while (r->command != tail_history->next->value){    // va sempre avanti di 1
 
         if(r->next == NULL){                    // voglio fare la redo e ?
             return 0;
