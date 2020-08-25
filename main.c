@@ -121,6 +121,7 @@ void cleanUpHistoryFromHead(history_pointer* head);
 void freeUnusedHellContainer(documentRemoved_pointer* hell);
 void freeUnusedHeavenContainer(documentRemoved_pointer* heaven);
 void freeUnusedHistoryNode();
+void freeUnusedTreeNode(tree_pointer* x);
 
 // DB HELPER
 void addToHeaven(documentRemoved_pointer* heaven, container_pointer* c);
@@ -162,9 +163,10 @@ int main() {
 
             if(undo > 0){       // mi serve per la undo/redo
 
-                freeUnusedHistoryNode();
                 freeUnusedHellContainer(&hell);
                 freeUnusedHeavenContainer(&heaven);
+                freeUnusedTreeNode(&tree_root);
+                freeUnusedHistoryNode();
 
                 undo = 0;
             }
@@ -197,9 +199,10 @@ int main() {
 
             if(undo > 0){       // mi serve per la undo/redo
 
-                freeUnusedHistoryNode();
                 freeUnusedHellContainer(&hell);
                 freeUnusedHeavenContainer(&heaven);
+                freeUnusedTreeNode(&tree_root);
+                freeUnusedHistoryNode();
 
                 undo = 0;
             }
@@ -897,10 +900,19 @@ int undoDelete(documentRemoved_pointer* hell, documentRemoved_pointer* heaven, l
     remove_pointer r;
 
 
-    if(_hell->tail == NULL) {
+    if(_hell->tail == NULL){      // ci finisce solo se tail è null
+
         r = _hell->head;
     } else{
-        r = _hell->tail;
+
+        if(_hell->tail->next != NULL){
+
+            r = _hell->tail->next;
+        } else{
+
+            r = _hell->tail;
+        }
+
     }
 
 
@@ -987,9 +999,18 @@ int redoDelete(documentRemoved_pointer* hell, long treeIndexToRemove){
     remove_pointer r;
 
     if(_hell->tail == NULL){      // ci finisce solo se tail è null
+
         r = _hell->head;
     } else{
-        r = _hell->tail->next;
+
+        if(_hell->tail->next != NULL){
+
+            r = _hell->tail->next;
+        } else{
+
+            r = _hell->tail;
+        }
+
     }
 
     if( r->command != tail_history->next->value ){
@@ -1027,6 +1048,7 @@ void cleanUpTree(tree_pointer* x){
         if((*x)->value->textNode != NULL){
             cleanUpTextFromHead(&(*x)->value->textNode);
             (*x)->value->textNode = NULL;
+            (*x)->value->tail_textNode = NULL;
         }
 
         if((*x)->value != NULL){
@@ -1038,7 +1060,6 @@ void cleanUpTree(tree_pointer* x){
 
 
         free(*x);
-
 
     }
 }
@@ -1060,6 +1081,7 @@ void cleanUpHell(documentRemoved_pointer* hell){
 
                 cleanUpTextFromHead(&rem->textContainer->textNode);
                 rem->textContainer->textNode = NULL;
+                rem->textContainer->tail_textNode = NULL;
 
             }
 
@@ -1138,6 +1160,7 @@ void cleanUpTextFromHead(text_pointer* head){
         }
 
         free(bulldozer);
+        bulldozer = NULL;
         bulldozer = nextMiles;
     }
 }
@@ -1159,6 +1182,8 @@ void cleanUpHistoryFromHead(history_pointer* head){
         }
 
         free(bulldozer);
+        bulldozer = NULL;
+
         bulldozer = nextMiles;
     }
 }
@@ -1179,6 +1204,7 @@ void freeUnusedHellContainer(documentRemoved_pointer* hell){
 
             cleanUpTextFromHead(&bulldozer->textContainer->textNode);
             bulldozer->textContainer->textNode = NULL;
+            bulldozer->textContainer->tail_textNode = NULL;
 
         }
 
@@ -1187,6 +1213,8 @@ void freeUnusedHellContainer(documentRemoved_pointer* hell){
         bulldozer->textContainer = NULL;
 
         free(bulldozer);
+        bulldozer = NULL;
+
         bulldozer = nextMiles;
     }
 
@@ -1210,6 +1238,7 @@ void freeUnusedHeavenContainer(documentRemoved_pointer* heaven){
 
             cleanUpTextFromHead(&bulldozer->textContainer->textNode);
             bulldozer->textContainer->textNode = NULL;
+            bulldozer->textContainer->tail_textNode = NULL;
 
         }
 
@@ -1217,6 +1246,8 @@ void freeUnusedHeavenContainer(documentRemoved_pointer* heaven){
         bulldozer->textContainer = NULL;
 
         free(bulldozer);
+        bulldozer = NULL;
+
         bulldozer = nextMiles;
     }
 
@@ -1232,6 +1263,38 @@ void freeUnusedHistoryNode(){
         tail_history->next = NULL;
 
     } else cleanUpHistoryFromHead(&head_history);
+
+}
+void freeUnusedTreeNode(tree_pointer* x){
+
+    if(*x != nil){
+        cleanUpTree(&(*x)->left);
+        cleanUpTree(&(*x)->right);
+
+        if((*x)->value->tail_textNode == NULL){
+
+            if((*x)->value->textNode != NULL){
+
+                cleanUpTextFromHead(&(*x)->value->textNode);
+                (*x)->value->textNode = NULL;
+                (*x)->value->tail_textNode = NULL;
+            }
+
+            if((*x)->value != NULL){
+
+                free((*x)->value);
+                (*x)->value = NULL;
+
+            }
+
+
+            free(*x);
+
+            (*x) = nil;
+
+        }
+
+    }
 
 }
 
