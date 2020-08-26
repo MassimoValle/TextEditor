@@ -82,9 +82,9 @@ void cleanUpHistoryFromHead(history_pointer* head);
 int main() {
 
     for (int i = 0; i < ARRAY_LEN; ++i) {
-        document[i] = createContainer();
-        hell[i] = createContainer();
-        heaven[i] = createContainer();
+        document[i] = NULL;
+        hell[i] = NULL;
+        heaven[i] = NULL;
     }
 
     long undo = 0;      // indica di quante istruzioni si è fatta la undo
@@ -171,10 +171,16 @@ int main() {
 
             for (int i = 0; i < numRow; i++) {
 
-                text_pointer text = (document[ind1+i])->tail_textNode;
+                if(document[ind1+i] == NULL){
+                    printf(".\n");
+                } else{
 
-                if(text == NULL) printf(".\n");
-                else printf("%s\n", text->value);
+                    text_pointer text = (document[ind1+i])->tail_textNode;
+
+                    if(text == NULL) printf(".\n");
+                    else printf("%s\n", text->value);
+
+                }
 
             }
 
@@ -368,6 +374,10 @@ void addInHistory() {
 }
 void addToDocument(char *x, long index){
 
+    if(document[index] == NULL){
+        document[index] = createContainer();
+    }
+
     container_pointer element = document[index];
 
     if(element->head_textNode == NULL){
@@ -393,9 +403,17 @@ void removeToDocument(long startIndex, long howMany, char* command){
 
     long iterator = 0;
 
+    if(document[startIndex+iterator] == NULL){
+        document[startIndex+iterator] = createContainer();
+    }
+
     while (document[startIndex+iterator]->head_textNode != NULL){
 
         if(iterator < howMany){
+
+            if(hell[nodeInHell] == NULL){
+                hell[nodeInHell] = createContainer();
+            }
 
             hell[nodeInHell]->index = document[startIndex+iterator]->index-iterator;
             hell[nodeInHell]->command = command;
@@ -410,10 +428,18 @@ void removeToDocument(long startIndex, long howMany, char* command){
 
         }
 
+        if(document[startIndex+howMany+iterator] == NULL){
+            document[startIndex+howMany+iterator] = createContainer();
+        }
+
         document[startIndex+iterator]->head_textNode = document[startIndex+howMany+iterator]->head_textNode;
         document[startIndex+iterator]->tail_textNode = document[startIndex+howMany+iterator]->tail_textNode;
 
         iterator++;
+
+        if(document[startIndex+iterator] == NULL){
+            document[startIndex+iterator] = createContainer();
+        }
 
     }
 
@@ -475,6 +501,9 @@ int undoDelete(long numRow){
 
         }
 
+        if(document[iterator] == NULL){
+            document[iterator] = createContainer();
+        }
 
         document[iterator]->head_textNode = tmp_head;
         document[iterator]->tail_textNode = tmp_tail;
@@ -487,6 +516,10 @@ int undoDelete(long numRow){
         if(document[r_index]->head_textNode != NULL){
 
             for (int i = 0; i < numRow; ++i) {
+
+                if(heaven[nodeInHeaven] == NULL){
+                    heaven[nodeInHeaven] = createContainer();
+                }
 
                 heaven[nodeInHeaven]->index = document[r_index+i]->index-i;
                 heaven[nodeInHeaven]->head_textNode = document[r_index+i]->head_textNode;
@@ -501,6 +534,10 @@ int undoDelete(long numRow){
 
             ret = 2;
 
+        }
+
+        if(document[r_index] == NULL){
+            document[r_index] = createContainer();
         }
 
         document[r_index]->head_textNode = r->head_textNode;
@@ -548,6 +585,9 @@ void redoChange(long num){
             }
 
 
+            if(document[key] == NULL){
+                document[key] = createContainer();
+            }
 
             while (document[key]->head_textNode != NULL) {
 
@@ -564,6 +604,9 @@ void redoChange(long num){
 
             }
 
+            if(document[key] == NULL){
+                document[key] = createContainer();
+            }
 
             document[key]->head_textNode = tmp_head;
             document[key]->tail_textNode = tmp_tail;
@@ -577,7 +620,6 @@ void redoChange(long num){
         }
 
 }
-
 int redoDelete(long treeIndexToRemove, long howMany){
 
     char* command = NULL;
@@ -645,6 +687,10 @@ void freeDocument(){
 
     long iterator = 1;
 
+    if(document[iterator] == NULL){
+        document[iterator] = createContainer();
+    }
+
     while (document[iterator]->head_textNode != NULL) {
 
         if( document[iterator]->tail_textNode == NULL ){
@@ -657,6 +703,10 @@ void freeDocument(){
 
 
         iterator++;
+
+        if(document[iterator] == NULL){
+            document[iterator] = createContainer();
+        }
     }
 
 }
@@ -677,12 +727,20 @@ void freeHeaven(){
 
     long iterator = nodeInHeaven-1;
 
+    if(heaven[iterator] == NULL){
+        heaven[iterator] = createContainer();
+    }
+
     while (heaven[iterator]->head_textNode != NULL) {
 
         heaven[iterator]->head_textNode = NULL;
         heaven[iterator]->tail_textNode = NULL;
 
         iterator++;
+
+        if(heaven[iterator] == NULL){
+            heaven[iterator] = createContainer();
+        }
     }
 
 }
