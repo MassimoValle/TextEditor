@@ -325,12 +325,13 @@ int main() {
 // CREATE NODES
 container_pointer createContainer(){
 
-    container_pointer ret = (container_pointer)malloc(sizeof(struct TextNodeContainer));
+    //container_pointer ret = (container_pointer)malloc(sizeof(struct TextNodeContainer));
+    container_pointer ret = (container_pointer)calloc(1, sizeof(struct TextNodeContainer));
 
-    ret->index = 0;
+    /*ret->index = 0;
     ret->command = NULL;
     ret->head_textNode = NULL;
-    ret->tail_textNode = NULL;
+    ret->tail_textNode = NULL;*/
 
     return ret;
 }
@@ -403,11 +404,12 @@ void removeToDocument(long startIndex, long howMany, char* command){
 
     long iterator = 0;
 
-    if(document[startIndex+iterator] == NULL){
-        document[startIndex+iterator] = createContainer();
+    if(document[startIndex+iterator] == NULL){          // controllo l'elemento di partenza
+        //document[startIndex+iterator] = createContainer();
+        return;
     }
 
-    while (document[startIndex+iterator]->head_textNode != NULL){
+    while (document[startIndex+iterator]->head_textNode != NULL){   // se è un elemento su cui si sono fatte undo (quindi tail==NULL ma head!=NULL) lo metto in hell
 
         if(iterator < howMany){
 
@@ -428,7 +430,7 @@ void removeToDocument(long startIndex, long howMany, char* command){
 
         }
 
-        if(document[startIndex+howMany+iterator] == NULL){
+        if(document[startIndex+howMany+iterator] == NULL){      // poichè faccio una pull, devo verificare che l'ultimo elemento sia stato creato prima di tirarlo giù
             document[startIndex+howMany+iterator] = createContainer();
         }
 
@@ -438,7 +440,7 @@ void removeToDocument(long startIndex, long howMany, char* command){
         iterator++;
 
         if(document[startIndex+iterator] == NULL){
-            document[startIndex+iterator] = createContainer();
+            return;
         }
 
     }
@@ -447,7 +449,7 @@ void removeToDocument(long startIndex, long howMany, char* command){
 
 int undoChange(long num) {
 
-    container_pointer c = document[num];
+    container_pointer c = document[num];    // document[num] deve esserci per forza per poter fare una undoChange
 
     if (c->tail_textNode == NULL) {     // se annullo l'istruzione che ha creato quel nodo
         return 0;
@@ -471,22 +473,27 @@ int undoDelete(long numRow){
         return 0;
     }
 
-    container_pointer r = hell[nodeInHell-1];
+    container_pointer r = hell[nodeInHell-1];   // hell[nodeInHell-1] deve esserci per forza per poter fare una undoDelete
     long r_index = r->index;
 
-    if(document[r_index]->tail_textNode != NULL){
 
-        text_pointer tmp_head = document[r_index]->head_textNode;
+    if(document[r_index]->tail_textNode != NULL){   // prendo l'elemento al quale rimpiazzare r
+
+        text_pointer tmp_head = document[r_index]->head_textNode;   // mi salvo le sue componenti
         text_pointer tmp_tail = document[r_index]->tail_textNode;
 
-        document[r_index]->head_textNode = r->head_textNode;
+        document[r_index]->head_textNode = r->head_textNode;    // assegno le componenti di r all'elemento
         document[r_index]->tail_textNode = r->tail_textNode;
 
 
         long iterator = r_index+1;
 
 
-        while (document[iterator]->head_textNode != NULL) {
+        if(document[iterator] == NULL){                 // se non ci sono elementi dopo r_index nel documento
+            document[iterator] = createContainer();
+        }
+
+        while (document[iterator]->head_textNode != NULL) { // in modo che questo non dia errore
 
             text_pointer tmp_head_2 = document[iterator]->head_textNode;
             text_pointer tmp_tail_2 = document[iterator]->tail_textNode;
@@ -498,6 +505,11 @@ int undoDelete(long numRow){
             tmp_tail = tmp_tail_2;
 
             iterator++;
+
+
+            if(document[iterator] == NULL){
+                document[iterator] = createContainer();
+            }
 
         }
 
@@ -513,7 +525,7 @@ int undoDelete(long numRow){
 
     else{
 
-        if(document[r_index]->head_textNode != NULL){
+        if(document[r_index]->head_textNode != NULL){   // se head==NULL significa che devo aggiungere un elemento ad heaven
 
             for (int i = 0; i < numRow; ++i) {
 
@@ -557,7 +569,7 @@ int undoDelete(long numRow){
 }
 void redoChange(long num){
 
-        container_pointer container = document[num];
+        container_pointer container = document[num];    // a logica dovrebbe essere stato inizializzato il container se provo a farci su una redoChange
 
         if(container->head_textNode != NULL){
 
@@ -601,6 +613,10 @@ void redoChange(long num){
                 tmp_tail = tmp_tail_2;
 
                 key++;
+
+                if(document[key] == NULL){
+                    document[key] = createContainer();
+                }
 
             }
 
