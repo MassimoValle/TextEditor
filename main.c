@@ -66,7 +66,7 @@ history_pointer createHistoryNode(char *x);
 // DB MANAGING
 void addInHistory();
 void addToDocument(char *x, long index);
-void removeToDocument(long startIndex, long howMany, char* command);
+void removeToDocument(long startIndex, long howMany, char* command, int hellOrHeaven);
 
 void undoToDocument(long ret);
 void redoToDocument(long ret);
@@ -163,7 +163,7 @@ int main() {
 
                 long numRow = ind2 - ind1 + 1;
 
-                removeToDocument(ind1, numRow, tail_history->value);   // rimuovo dal documento il nodo(listNodeToDelete) e lo metto in hell
+                removeToDocument(ind1, numRow, tail_history->value, 0);   // rimuovo dal documento il nodo(listNodeToDelete) e lo metto in hell
             }
 
         }
@@ -462,7 +462,7 @@ void addToDocument(char *x, long index){
 
 
 }
-void removeToDocument(long startIndex, long howMany, char* command){
+void removeToDocument(long startIndex, long howMany, char* command, int hellOrHeaven){
 
     long iterator = 0;
 
@@ -475,19 +475,34 @@ void removeToDocument(long startIndex, long howMany, char* command){
 
         if(iterator < howMany){
 
-            if(hell[nodeInHell] == NULL){
-                hell[nodeInHell] = createContainer();
+            if(hellOrHeaven == 0){
+                if(hell[nodeInHell] == NULL){
+                    hell[nodeInHell] = createContainer();
+                }
+
+                hell[nodeInHell]->index = document[startIndex+iterator]->index-iterator;
+                hell[nodeInHell]->command = command;
+                hell[nodeInHell]->head_textNode = document[startIndex+iterator]->head_textNode;
+                hell[nodeInHell]->tail_textNode = document[startIndex+iterator]->tail_textNode;
+                /*cleanUpTextFromHead(&document[startIndex+iterator]->head_textNode);
+                document[startIndex+iterator]->head_textNode = NULL;
+                document[startIndex+iterator]->tail_textNode = NULL;*/
+
+                nodeInHell++;
+            } else{
+
+                if(heaven[nodeInHeaven] == NULL){
+                    heaven[nodeInHeaven] = createContainer();
+                }
+
+                heaven[nodeInHeaven]->index = document[startIndex+iterator]->index-iterator;
+                heaven[nodeInHeaven]->head_textNode = document[startIndex+iterator]->head_textNode;
+                heaven[nodeInHeaven]->tail_textNode = document[startIndex+iterator]->tail_textNode;
+
+                nodeInHeaven++;
             }
 
-            hell[nodeInHell]->index = document[startIndex+iterator]->index-iterator;
-            hell[nodeInHell]->command = command;
-            hell[nodeInHell]->head_textNode = document[startIndex+iterator]->head_textNode;
-            hell[nodeInHell]->tail_textNode = document[startIndex+iterator]->tail_textNode;
-            /*cleanUpTextFromHead(&document[startIndex+iterator]->head_textNode);
-            document[startIndex+iterator]->head_textNode = NULL;
-            document[startIndex+iterator]->tail_textNode = NULL;*/
 
-            nodeInHell++;
 
 
         }
@@ -807,8 +822,16 @@ int redoDelete(long treeIndexToRemove, long howMany){
         }
 
     }
+    // altering2 -> hellOrHeaven = 1
+    // rolling1 -> hellOrHeaven = 0
 
-    removeToDocument(treeIndexToRemove, howMany, command);
+    int hellOrHeaven;
+
+    if(tail_history != NULL){       // da capire se è corretto fare così
+        hellOrHeaven = 0;
+    } else hellOrHeaven = 1;
+
+    removeToDocument(treeIndexToRemove, howMany, command, hellOrHeaven);
 
     return 1;
 
