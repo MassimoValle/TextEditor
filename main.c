@@ -45,7 +45,15 @@ container_pointer heaven[ARRAY_LEN];
 long nodeInHell = 0;
 long nodeInHeaven = 0;
 char* row;
+char* pendingCommand;
 
+long undo = 0;      // indica di quante istruzioni si è fatta la undo
+long redo = 0;
+
+long possiblyRedo = 0;
+long doUndo = 0;
+long doRedo = 0;
+int undoOrRedoDone = 0;
 
 
 
@@ -59,6 +67,10 @@ history_pointer createHistoryNode(char *x);
 void addInHistory();
 void addToDocument(char *x, long index);
 void removeToDocument(long startIndex, long howMany, char* command);
+
+void undoToDocument(long ret);
+void redoToDocument(long ret);
+
 int undoChange(long num);
 int undoDelete(long numRow);
 void redoChange(long num);
@@ -87,8 +99,7 @@ int main() {
         heaven[i] = NULL;
     }
 
-    long undo = 0;      // indica di quante istruzioni si è fatta la undo
-
+    int exit = 0;
     row = getRow();
 
     while (strstr(row, "q") == NULL){
@@ -96,92 +107,107 @@ int main() {
 
         if (strstr(row, "c") != NULL) {     // modifica o inserimento di righe
 
-            if(undo > 0){       // mi serve per la undo/redo
+            if(undo > 0 || redo > 0){       // mi serve per la undo/redo
 
-                freeDocument();
-                //freeHell();
-                freeHeaven();
+                pendingCommand = row;
+                doUndo = 1;
+                doRedo = 1;
+                exit = 1;
 
-                undo = 0;
             }
 
-            addInHistory();                     // aggiungo il comando alla cronologia
+            if(exit != 1) {
 
-            long ind1 = 0, ind2 = 0;
+                addInHistory();                     // aggiungo il comando alla cronologia
 
-            getBounds(row, &ind1, &ind2);       // prendo gli indici del comando
+                long ind1 = 0, ind2 = 0;
 
-            long numRow = ind2-ind1+1;
+                getBounds(row, &ind1, &ind2);       // prendo gli indici del comando
 
-            // MODO 1
-            for (int i = 0; i < numRow; i++) {
+                long numRow = ind2 - ind1 + 1;
 
-                long key = ind1+i;
+                // MODO 1
+                for (int i = 0; i < numRow; i++) {
+
+                    long key = ind1 + i;
+                    getRow();
+
+                    addToDocument(row, key);     // aggiungo all'albero al la stringa(row) all'indice key
+                }
+
                 getRow();
 
-                addToDocument(row, key);     // aggiungo all'albero al la stringa(row) all'indice key
+                if (strstr(row, ".") != NULL) {
+                    free(row);
+                } else printf("something went wrong\n");
             }
-
-            getRow();
-
-            if(strstr(row, ".") != NULL){
-                free(row);
-            } else printf("something went wrong\n");
 
         }
         else if (strstr(row, "d") != NULL) {         // elimina righe se presenti nel documento
 
-            if(undo > 0){       // mi serve per la undo/redo
+            if(undo > 0 || redo > 0){       // mi serve per la undo/redo
 
-                freeDocument();
-                //freeHell();
-                freeHeaven();
+                pendingCommand = row;
+                doUndo = 1;
+                doRedo = 1;
+                exit = 1;
 
-                undo = 0;
             }
 
+            if(exit != 1) {
 
-            addInHistory();             // aggiungo il comando alla cronologia
+                addInHistory();             // aggiungo il comando alla cronologia
 
-            long ind1, ind2;
-            getBounds(row, &ind1, &ind2);
+                long ind1, ind2;
+                getBounds(row, &ind1, &ind2);
 
-            long numRow = ind2-ind1+1;
+                long numRow = ind2 - ind1 + 1;
 
-            removeToDocument(ind1, numRow, tail_history->value);   // rimuovo dal documento il nodo(listNodeToDelete) e lo metto in hell
-
+                removeToDocument(ind1, numRow, tail_history->value);   // rimuovo dal documento il nodo(listNodeToDelete) e lo metto in hell
+            }
 
         }
         else if (strstr(row, "p") != NULL) {
 
-            long ind1, ind2;
-            getBounds(row, &ind1, &ind2);
+            if(undo > 0 || redo > 0){       // mi serve per la undo/redo
 
-            free(row);
+                pendingCommand = row;
+                doUndo = 1;
+                doRedo = 1;
+                exit = 1;
 
-
-            if(ind2 == 0){
-                printf(".\n");
-                getRow();
-                continue;
             }
-            long numRow = ind2-ind1+1;
+
+            if(exit != 1) {
+
+                long ind1, ind2;
+                getBounds(row, &ind1, &ind2);
+
+                free(row);
 
 
-
-            for (int i = 0; i < numRow; i++) {
-
-                if(document[ind1+i] == NULL){
+                if (ind2 == 0) {
                     printf(".\n");
-                } else{
+                    getRow();
+                    continue;
+                }
+                long numRow = ind2 - ind1 + 1;
 
-                    text_pointer text = (document[ind1+i])->tail_textNode;
 
-                    if(text == NULL) printf(".\n");
-                    else printf("%s\n", text->value);
+                for (int i = 0; i < numRow; i++) {
+
+                    if (document[ind1 + i] == NULL) {
+                        printf(".\n");
+                    } else {
+
+                        text_pointer text = (document[ind1 + i])->tail_textNode;
+
+                        if (text == NULL) printf(".\n");
+                        else printf("%s\n", text->value);
+
+                    }
 
                 }
-
             }
 
         }
@@ -192,107 +218,50 @@ int main() {
 
             free(row);
 
-            undo += ret;
+            if(doUndo == 1){
 
-            for (int i = 0; i < ret; ++i) {
-                long ind1, ind2;
+                undoToDocument(ret);
+                undoOrRedoDone = 1;
 
-                if(tail_history == NULL){
-                    undo--;
-                    continue;
-                }
+            } else{
 
-                getBounds(tail_history->value, &ind1, &ind2);
-
-                long numRow = ind2-ind1+1;
-
-                int val = 0;
-
-                for (int j = 0; j < numRow; ++j) {
-
-                    if(tail_history->value[3] == 'c'){
-
-                        val = undoChange(ind1+j);
-
-                        if(val == 0){
-                            continue;
-                        }
-
-
-                    } else{
-
-                        if(val == 2){
-                            val = undoDelete(0);
-                        } else{
-                            val = undoDelete(numRow);
-                        }
-
-                        if(val == 0){
-                            continue;
-                        }
-
-                    }
-                }
-
-                tail_history = tail_history->prev;
+                undo += ret;
             }
 
         }
         else if (strstr(row, "r") != NULL) {
 
-            if(undo > 0){
+            if(undo > 0 || possiblyRedo > 0){
 
                 char* q;
                 long ret = strtol(row, &q, 10);
 
                 free(row);
 
+                if(doRedo == 1){
 
-                if(ret > undo){
-                    ret = undo;
-                }
+                    redoToDocument(ret);
+                    undoOrRedoDone = 1;
+                    redo -= ret;
+                    possiblyRedo -= ret;
 
-                for (int i = 0; i < ret; ++i) {
-                    long ind1, ind2;
+                } else{
 
-                    char* historyCommand = NULL;
-                    if(tail_history != NULL){
-                        historyCommand = tail_history->next->value;
-                    }
-                    else historyCommand = head_history->value;
+                    redo += ret;
 
+                    if(possiblyRedo == 0){
 
-                    getBounds(historyCommand, &ind1, &ind2);
+                        if(redo > undo){ redo = undo; }
+                    } else{
 
-
-                    long numRow = ind2-ind1+1;
-
-                    long val = 0;
-
-                    for (int j = 0; j < numRow; ++j) {
-
-                        if(historyCommand[3] == 'c'){
-
-                            redoChange(ind1+j);
-
-                        } else{
-
-                            if(val != 1){
-
-                                val = redoDelete(ind1, numRow);
-
-                            }
-
+                        if(redo > possiblyRedo + undo){
+                            redo = possiblyRedo + undo;
                         }
-
                     }
 
-                    if(tail_history != NULL){
-                        tail_history = tail_history->next;
-                    } else tail_history = head_history;
-                }
 
-                undo -= ret;
+
+                }
 
             }
             else{
@@ -303,7 +272,100 @@ int main() {
 
         }
 
-        getRow();
+        if(doUndo == 1){
+
+            if(undoOrRedoDone == 0){
+
+                if(redo > 0) {
+                    redo -= undo;
+                    undo = 0;
+                }
+
+                long undoSet;
+
+                /*if(possiblyRedo == 0){      // redo prima della print
+
+                    if(redo > undo) redo = undo;
+
+                    undoSet = undo - redo;
+                } else{                     // redo dopo la print*/
+
+                    if(redo > possiblyRedo) {   // ci sono più redo di undo
+
+                        redo = possiblyRedo;
+
+                        undoSet = -redo;
+
+                    } else{     // ci sopo più undo delle redo oppure si bilanciano
+                        undoSet = undo - redo;
+                    }
+
+                //}
+
+
+                if(undoSet > 0){
+                    row = NULL;
+                    row = (char*)calloc(21, sizeof(char));
+                    snprintf(row, 20, "%ldu", undoSet);
+
+                    possiblyRedo += undo;
+
+
+                }
+                else if(undoSet < 0){
+
+                    row = NULL;
+                    row = (char*)calloc(22, sizeof(char));
+                    snprintf(row, 21, "%ldr", -(undoSet));
+
+                } else if( undoSet == 0){
+
+                    if(strstr(pendingCommand, "p") == NULL){    // se il comando non è una print
+                        freeDocument();
+                        freeHeaven();
+                        possiblyRedo = 0;
+                    }
+
+                    row = NULL;
+                    row = pendingCommand;
+
+                    undo = 0;
+                    redo = 0;
+
+                    doUndo = 0;
+                    doRedo = 0;
+                    undoOrRedoDone = 0;
+
+                    exit = 0;
+
+                }
+            }
+            else{
+
+                if(strstr(pendingCommand, "p") == NULL){    // se il comando non è una print
+                    freeDocument();
+                    freeHeaven();
+                    possiblyRedo = 0;
+                }
+
+                row = NULL;
+                row = pendingCommand;
+
+                undo = 0;
+                redo = 0;
+
+                doUndo = 0;
+                doRedo = 0;
+                undoOrRedoDone = 0;
+
+                exit = 0;
+            }
+
+        }
+        else{
+
+            getRow();
+        }
 
     }
 
@@ -442,6 +504,99 @@ void removeToDocument(long startIndex, long howMany, char* command){
         if(document[startIndex+iterator] == NULL){
             return;
         }
+
+    }
+
+}
+
+void undoToDocument(long ret){
+
+    for (int i = 0; i < ret; ++i) {
+        long ind1, ind2;
+
+        if(tail_history == NULL){
+            //undo--;
+            continue;
+        }
+
+        getBounds(tail_history->value, &ind1, &ind2);
+
+        long numRow = ind2-ind1+1;
+
+        int val = 0;
+
+        for (int j = 0; j < numRow; ++j) {
+
+            if(tail_history->value[3] == 'c'){
+
+                val = undoChange(ind1+j);
+
+                if(val == 0){
+                    continue;
+                }
+
+
+            } else{
+
+                if(val == 2){
+                    val = undoDelete(0);
+                } else{
+                    val = undoDelete(numRow);
+                }
+
+                if(val == 0){
+                    continue;
+                }
+
+            }
+        }
+
+        tail_history = tail_history->prev;
+    }
+
+}
+void redoToDocument(long ret){
+
+    for (int i = 0; i < ret; ++i) {
+        long ind1, ind2;
+
+        char* historyCommand = NULL;
+        if(tail_history != NULL){
+
+            historyCommand = tail_history->next->value;
+
+        }
+        else historyCommand = head_history->value;
+
+
+        getBounds(historyCommand, &ind1, &ind2);
+
+
+        long numRow = ind2-ind1+1;
+
+        long val = 0;
+
+        for (int j = 0; j < numRow; ++j) {
+
+            if(historyCommand[3] == 'c'){
+
+                redoChange(ind1+j);
+
+            } else{
+
+                if(val != 1){
+
+                    val = redoDelete(ind1, numRow);
+
+                }
+
+            }
+
+        }
+
+        if(tail_history != NULL){
+            tail_history = tail_history->next;
+        } else tail_history = head_history;
 
     }
 
