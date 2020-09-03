@@ -50,10 +50,13 @@ char* pendingCommand;
 long undo = 0;      // indica di quante istruzioni si è fatta la undo
 long redo = 0;
 
+long possiblyUndo = 0;
 long possiblyRedo = 0;
 long doUndo = 0;
 long doRedo = 0;
 int undoOrRedoDone = 0;
+
+//int validDelete = 0;
 
 
 
@@ -74,7 +77,7 @@ void redoToDocument(long ret);
 int undoChange(long num);
 int undoDelete(long numRow);
 void redoChange(long num);
-int redoDelete(long treeIndexToRemove, long howMany);
+int redoDelete(long treeIndexToRemove, long howMany, char* historyCommand);
 
 // HELPER
 char* getRow();
@@ -107,7 +110,7 @@ int main() {
 
         if (strstr(row, "c") != NULL) {     // modifica o inserimento di righe
 
-            if(undo > 0 || redo > 0){       // mi serve per la undo/redo
+            if(undo > 0 || redo > 0 || possiblyRedo > 0){       // mi serve per la undo/redo
 
                 pendingCommand = row;
                 doUndo = 1;
@@ -145,7 +148,7 @@ int main() {
         }
         else if (strstr(row, "d") != NULL) {         // elimina righe se presenti nel documento
 
-            if(undo > 0 || redo > 0){       // mi serve per la undo/redo
+            if(undo > 0 || redo > 0 || possiblyRedo > 0){       // mi serve per la undo/redo
 
                 pendingCommand = row;
                 doUndo = 1;
@@ -221,11 +224,16 @@ int main() {
             if(doUndo == 1){
 
                 undoToDocument(ret);
+                possiblyUndo -= ret;
                 undoOrRedoDone = 1;
 
             } else{
 
                 undo += ret;
+
+                if(undo > possiblyUndo + redo){
+                    undo = possiblyUndo + redo;
+                }
             }
 
         }
@@ -243,6 +251,7 @@ int main() {
                     redoToDocument(ret);
                     undoOrRedoDone = 1;
                     redo -= ret;
+                    possiblyUndo += ret;
                     possiblyRedo -= ret;
 
                 } else{
@@ -308,8 +317,11 @@ int main() {
                     row = (char*)calloc(21, sizeof(char));
                     snprintf(row, 20, "%ldu", undoSet);
 
-                    possiblyRedo += undo;
-
+                    if(redo < 0){
+                        possiblyRedo -= redo;
+                    } else{
+                        possiblyRedo += undo;
+                    }
 
                 }
                 else if(undoSet < 0){
@@ -434,6 +446,8 @@ void addInHistory() {
         tail_history = newNode;
     }
 
+    possiblyUndo++;
+
 }
 void addToDocument(char *x, long index){
 
@@ -470,6 +484,8 @@ void removeToDocument(long startIndex, long howMany, char* command, int hellOrHe
         //document[startIndex+iterator] = createContainer();
         return;
     }
+
+    //validDelete++;   // questa delete è valida
 
     while (document[startIndex+iterator]->head_textNode != NULL){   // se è un elemento su cui si sono fatte undo (quindi tail==NULL ma head!=NULL) lo metto in hell
 
@@ -576,13 +592,30 @@ void redoToDocument(long ret){
         long ind1, ind2;
 
         char* historyCommand = NULL;
-        if(tail_history != NULL){
+        /*if(tail_history != NULL){
 
-            historyCommand = tail_history->next->value;
+            if(tail_history->next != NULL){
+                historyCommand = tail_history->next->value;
+            } else{
+                return;
+            }
 
         }
-        else historyCommand = head_history->value;
+         else historyCommand = head_history->value;
+         */
 
+        if(tail_history == NULL){
+
+            historyCommand = head_history->value;
+        } else{
+
+            if(tail_history->next != NULL){
+                historyCommand = tail_history->next->value;
+            } else{
+                historyCommand = tail_history->value;
+            }
+
+        }
 
         getBounds(historyCommand, &ind1, &ind2);
 
@@ -601,7 +634,7 @@ void redoToDocument(long ret){
 
                 if(val != 1){
 
-                    val = redoDelete(ind1, numRow);
+                    val = redoDelete(ind1, numRow, historyCommand);
 
                 }
 
@@ -642,6 +675,8 @@ int undoDelete(long numRow){
     if(hell[nodeInHell-1]->command != tail_history->value){
         return 0;
     }
+
+    //validDelete--; // questa delete è stata annullata
 
     container_pointer r = hell[nodeInHell-1];   // hell[nodeInHell-1] deve esserci per forza per poter fare una undoDelete
     long r_index = r->index;
@@ -806,11 +841,11 @@ void redoChange(long num){
         }
 
 }
-int redoDelete(long treeIndexToRemove, long howMany){
+int redoDelete(long treeIndexToRemove, long howMany, char* historyCommand){
 
-    char* command = NULL;
+    //char* command = historyCommand;
 
-    if(tail_history == NULL){
+    /*if(tail_history == NULL){
 
         command = head_history->value;
     } else{
@@ -821,17 +856,19 @@ int redoDelete(long treeIndexToRemove, long howMany){
             command = tail_history->value;
         }
 
-    }
+    }*/
     // altering2 -> hellOrHeaven = 1
     // rolling1 -> hellOrHeaven = 0
 
-    int hellOrHeaven;
+    int hellOrHeaven = 0;
 
-    if(tail_history != NULL){       // da capire se è corretto fare così
+    /*if(tail_history != NULL){       // da capire se è corretto fare così
         hellOrHeaven = 0;
-    } else hellOrHeaven = 1;
+    } else hellOrHeaven = 1;*/
 
-    removeToDocument(treeIndexToRemove, howMany, command, hellOrHeaven);
+    if(document[treeIndexToRemove]->tail_textNode != NULL){   // da controllare
+        removeToDocument(treeIndexToRemove, howMany, historyCommand, hellOrHeaven);
+    }
 
     return 1;
 
@@ -919,7 +956,7 @@ void freeHell(){
 }
 void freeHeaven(){
 
-    long iterator = nodeInHeaven-1;
+    long iterator = 0;//nodeInHeaven-1;
 
     if(heaven[iterator] == NULL){
         heaven[iterator] = createContainer();
@@ -936,6 +973,8 @@ void freeHeaven(){
             heaven[iterator] = createContainer();
         }
     }
+
+    nodeInHeaven = 0;
 
 }
 
