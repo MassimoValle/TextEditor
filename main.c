@@ -56,8 +56,6 @@ long doUndo = 0;
 long doRedo = 0;
 int undoOrRedoDone = 0;
 
-//int validDelete = 0;
-
 
 
 
@@ -69,7 +67,7 @@ history_pointer createHistoryNode(char *x);
 // DB MANAGING
 void addInHistory();
 void addToDocument(char *x, long index);
-void removeToDocument(long startIndex, long howMany, char* command, int hellOrHeaven);
+void removeToDocument(long startIndex, long howMany, char* command);
 
 void undoToDocument(long ret);
 void redoToDocument(long ret);
@@ -84,14 +82,8 @@ char* getRow();
 void getBounds(char* line, long *ind1, long *ind2);
 
 void freeDocument();
-void freeHell();
 void freeHeaven();
 
-
-void cleanUpDocumentTextNode();
-void cleanUpDocumentContainer();
-void cleanUpTextFromHead(text_pointer* head);
-void cleanUpHistoryFromHead(history_pointer* head);
 
 
 int main() {
@@ -129,7 +121,7 @@ int main() {
 
                 long numRow = ind2 - ind1 + 1;
 
-                // MODO 1
+
                 for (int i = 0; i < numRow; i++) {
 
                     long key = ind1 + i;
@@ -166,7 +158,7 @@ int main() {
 
                 long numRow = ind2 - ind1 + 1;
 
-                removeToDocument(ind1, numRow, tail_history->value, 0);   // rimuovo dal documento il nodo(listNodeToDelete) e lo metto in hell
+                removeToDocument(ind1, numRow, tail_history->value);   // rimuovo dal documento il nodo(listNodeToDelete) e lo metto in hell
             }
 
         }
@@ -277,8 +269,6 @@ int main() {
                 free(row);  // è una redo a vuoto (senza che prima ci sia un'undo), quindi la ignoro
             }
 
-
-
         }
 
         if(doUndo == 1){
@@ -290,27 +280,19 @@ int main() {
                     undo = 0;
                 }
 
+
+
                 long undoSet;
 
-                /*if(possiblyRedo == 0){      // redo prima della print
+                if(redo > possiblyRedo) {   // ci sono più redo di undo
 
-                    if(redo > undo) redo = undo;
+                    redo = possiblyRedo;
 
+                    undoSet = -redo;
+
+                } else{     // ci sopo più undo delle redo oppure si bilanciano
                     undoSet = undo - redo;
-                } else{                     // redo dopo la print*/
-
-                    if(redo > possiblyRedo) {   // ci sono più redo di undo
-
-                        redo = possiblyRedo;
-
-                        undoSet = -redo;
-
-                    } else{     // ci sopo più undo delle redo oppure si bilanciano
-                        undoSet = undo - redo;
-                    }
-
-                //}
-
+                }
 
                 if(undoSet > 0){
                     row = NULL;
@@ -380,12 +362,6 @@ int main() {
         }
 
     }
-
-    /*
-    cleanUpDocumentTextNode();
-    cleanUpDocumentContainer();
-    cleanUpHistoryFromHead(&head_history);
-    */
 
 
     free(row);
@@ -476,50 +452,28 @@ void addToDocument(char *x, long index){
 
 
 }
-void removeToDocument(long startIndex, long howMany, char* command, int hellOrHeaven){
+void removeToDocument(long startIndex, long howMany, char* command){
 
     long iterator = 0;
 
     if(document[startIndex+iterator] == NULL){          // controllo l'elemento di partenza
-        //document[startIndex+iterator] = createContainer();
         return;
     }
-
-    //validDelete++;   // questa delete è valida
 
     while (document[startIndex+iterator]->head_textNode != NULL){   // se è un elemento su cui si sono fatte undo (quindi tail==NULL ma head!=NULL) lo metto in hell
 
         if(iterator < howMany){
 
-            if(hellOrHeaven == 0){
-                if(hell[nodeInHell] == NULL){
-                    hell[nodeInHell] = createContainer();
-                }
-
-                hell[nodeInHell]->index = document[startIndex+iterator]->index-iterator;
-                hell[nodeInHell]->command = command;
-                hell[nodeInHell]->head_textNode = document[startIndex+iterator]->head_textNode;
-                hell[nodeInHell]->tail_textNode = document[startIndex+iterator]->tail_textNode;
-                /*cleanUpTextFromHead(&document[startIndex+iterator]->head_textNode);
-                document[startIndex+iterator]->head_textNode = NULL;
-                document[startIndex+iterator]->tail_textNode = NULL;*/
-
-                nodeInHell++;
-            } else{
-
-                if(heaven[nodeInHeaven] == NULL){
-                    heaven[nodeInHeaven] = createContainer();
-                }
-
-                heaven[nodeInHeaven]->index = document[startIndex+iterator]->index-iterator;
-                heaven[nodeInHeaven]->head_textNode = document[startIndex+iterator]->head_textNode;
-                heaven[nodeInHeaven]->tail_textNode = document[startIndex+iterator]->tail_textNode;
-
-                nodeInHeaven++;
+            if(hell[nodeInHell] == NULL){
+                hell[nodeInHell] = createContainer();
             }
 
+            hell[nodeInHell]->index = document[startIndex+iterator]->index-iterator;
+            hell[nodeInHell]->command = command;
+            hell[nodeInHell]->head_textNode = document[startIndex+iterator]->head_textNode;
+            hell[nodeInHell]->tail_textNode = document[startIndex+iterator]->tail_textNode;
 
-
+            nodeInHell++;
 
         }
 
@@ -592,17 +546,6 @@ void redoToDocument(long ret){
         long ind1, ind2;
 
         char* historyCommand = NULL;
-        /*if(tail_history != NULL){
-
-            if(tail_history->next != NULL){
-                historyCommand = tail_history->next->value;
-            } else{
-                return;
-            }
-
-        }
-         else historyCommand = head_history->value;
-         */
 
         if(tail_history == NULL){
 
@@ -676,8 +619,6 @@ int undoDelete(long numRow){
         return 0;
     }
 
-    //validDelete--; // questa delete è stata annullata
-
     container_pointer r = hell[nodeInHell-1];   // hell[nodeInHell-1] deve esserci per forza per poter fare una undoDelete
     long r_index = r->index;
 
@@ -732,7 +673,9 @@ int undoDelete(long numRow){
 
         if(document[r_index]->head_textNode != NULL){   // se head==NULL significa che devo aggiungere un elemento ad heaven
 
-            for (int i = 0; i < numRow; ++i) {
+            int i = 0;
+            //for (int i = 0; i < numRow; ++i) {
+            while(document[r_index+i]->head_textNode != NULL && document[r_index+i]->tail_textNode == NULL){
 
                 if(heaven[nodeInHeaven] == NULL){
                     heaven[nodeInHeaven] = createContainer();
@@ -746,6 +689,11 @@ int undoDelete(long numRow){
                 document[r_index+i]->tail_textNode = NULL;
 
                 nodeInHeaven++;
+                i++;
+
+                if(document[r_index+i] == NULL){
+                    document[r_index+i] = createContainer();
+                }
 
             }
 
@@ -843,31 +791,8 @@ void redoChange(long num){
 }
 int redoDelete(long treeIndexToRemove, long howMany, char* historyCommand){
 
-    //char* command = historyCommand;
-
-    /*if(tail_history == NULL){
-
-        command = head_history->value;
-    } else{
-
-        if(tail_history->next != NULL){
-            command = tail_history->next->value;
-        } else{
-            command = tail_history->value;
-        }
-
-    }*/
-    // altering2 -> hellOrHeaven = 1
-    // rolling1 -> hellOrHeaven = 0
-
-    int hellOrHeaven = 0;
-
-    /*if(tail_history != NULL){       // da capire se è corretto fare così
-        hellOrHeaven = 0;
-    } else hellOrHeaven = 1;*/
-
     if(document[treeIndexToRemove]->tail_textNode != NULL){   // da controllare
-        removeToDocument(treeIndexToRemove, howMany, historyCommand, hellOrHeaven);
+        removeToDocument(treeIndexToRemove, howMany, historyCommand);
     }
 
     return 1;
@@ -941,19 +866,6 @@ void freeDocument(){
     }
 
 }
-void freeHell(){
-
-    long iterator = nodeInHell-1;
-
-    while (hell[iterator]->head_textNode != NULL) {
-
-        hell[iterator]->head_textNode = NULL;
-        hell[iterator]->tail_textNode = NULL;
-
-        iterator++;
-    }
-
-}
 void freeHeaven(){
 
     long iterator = 0;//nodeInHeaven-1;
@@ -976,77 +888,4 @@ void freeHeaven(){
 
     nodeInHeaven = 0;
 
-}
-
-void cleanUpDocumentTextNode(){
-
-    long iterator = 1;
-    while (document[iterator]->head_textNode != NULL){
-
-        cleanUpTextFromHead(&document[iterator]->head_textNode);
-        document[iterator]->head_textNode = NULL;
-        document[iterator]->tail_textNode = NULL;
-
-        iterator++;
-
-    }
-
-}
-void cleanUpDocumentContainer(){
-
-    long iterator = 0;
-    while (document[iterator] != NULL){
-
-        free(document[iterator]);
-        document[iterator] = NULL;
-
-        iterator++;
-
-    }
-
-}
-void cleanUpTextFromHead(text_pointer* head){
-
-    text_pointer bulldozer = *head;
-    text_pointer nextMiles = NULL;
-
-    while (bulldozer != NULL) {
-        if (bulldozer->next != NULL) {
-            nextMiles = bulldozer->next;
-        } else nextMiles = NULL;
-
-        if(bulldozer->value != NULL){
-
-            free(bulldozer->value);
-            bulldozer->value = NULL;
-
-        }
-
-        free(bulldozer);
-        bulldozer = NULL;
-        bulldozer = nextMiles;
-    }
-}
-void cleanUpHistoryFromHead(history_pointer* head){
-
-    history_pointer bulldozer = *head;
-    history_pointer nextMiles = NULL;
-
-    while (bulldozer != NULL) {
-        if (bulldozer->next != NULL) {
-            nextMiles = bulldozer->next;
-        } else nextMiles = NULL;
-
-        if(bulldozer->value != NULL){
-
-            free(bulldozer->value);
-            bulldozer->value = NULL;
-
-        }
-
-        free(bulldozer);
-        bulldozer = NULL;
-
-        bulldozer = nextMiles;
-    }
 }
