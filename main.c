@@ -13,6 +13,8 @@ typedef struct HistoryNode* history_pointer;
 // HISTORY STRUCT
 struct HistoryNode {
     char* value;
+    long ind1;
+    long ind2;
     history_pointer next;
     history_pointer prev;
 
@@ -45,6 +47,7 @@ container_pointer heaven[ARRAY_LEN];
 long nodeInHell = 0;
 long nodeInHeaven = 0;
 char* row;
+char tmp[1024];
 char* pendingCommand;
 
 long undo = 0;      // indica di quante istruzioni si è fatta la undo
@@ -62,10 +65,10 @@ int undoOrRedoDone = 0;
 // CREATE NODES
 container_pointer createContainer();
 text_pointer createTextNode(char *x);
-history_pointer createHistoryNode(char *x);
+history_pointer createHistoryNode(char *x, long ind1, long ind2);
 
 // DB MANAGING
-void addInHistory();
+void addInHistory(long ind1, long ind2);
 void addToDocument(char *x, long index);
 void removeToDocument(long startIndex, long howMany, char* command);
 
@@ -96,11 +99,12 @@ int main() {
 
     int exit = 0;
     row = getRow();
+    unsigned long len = strlen(row);
 
-    while (strstr(row, "q") == NULL){
+    while (row[len-1] != 'q'){
 
 
-        if (strstr(row, "c") != NULL) {     // modifica o inserimento di righe
+        if (row[len-1] == 'c') {     // modifica o inserimento di righe
 
             if(undo > 0 || redo > 0 || possiblyRedo > 0){       // mi serve per la undo/redo
 
@@ -113,11 +117,11 @@ int main() {
 
             if(exit != 1) {
 
-                addInHistory();                     // aggiungo il comando alla cronologia
-
                 long ind1 = 0, ind2 = 0;
 
                 getBounds(row, &ind1, &ind2);       // prendo gli indici del comando
+
+                addInHistory(ind1, ind2);                     // aggiungo il comando alla cronologia
 
                 long numRow = ind2 - ind1 + 1;
 
@@ -131,6 +135,7 @@ int main() {
                 }
 
                 getRow();
+                len = strlen(row);
 
                 if (strstr(row, ".") != NULL) {
                     free(row);
@@ -138,7 +143,7 @@ int main() {
             }
 
         }
-        else if (strstr(row, "d") != NULL) {         // elimina righe se presenti nel documento
+        else if (row[len-1] == 'd') {         // elimina righe se presenti nel documento
 
             if(undo > 0 || redo > 0 || possiblyRedo > 0){       // mi serve per la undo/redo
 
@@ -151,10 +156,10 @@ int main() {
 
             if(exit != 1) {
 
-                addInHistory();             // aggiungo il comando alla cronologia
-
                 long ind1, ind2;
                 getBounds(row, &ind1, &ind2);
+
+                addInHistory(ind1, ind2);             // aggiungo il comando alla cronologia
 
                 long numRow = ind2 - ind1 + 1;
 
@@ -162,7 +167,7 @@ int main() {
             }
 
         }
-        else if (strstr(row, "p") != NULL) {
+        else if (row[len-1] == 'p') {
 
             if(undo > 0 || redo > 0){       // mi serve per la undo/redo
 
@@ -184,6 +189,7 @@ int main() {
                 if (ind2 == 0) {
                     printf(".\n");
                     getRow();
+                    len = strlen(row);
                     continue;
                 }
                 long numRow = ind2 - ind1 + 1;
@@ -206,7 +212,7 @@ int main() {
             }
 
         }
-        else if (strstr(row, "u") != NULL) {
+        else if (row[len-1] == 'u') {
 
             char* q;
             long ret = strtol(row, &q, 10);
@@ -229,7 +235,7 @@ int main() {
             }
 
         }
-        else if (strstr(row, "r") != NULL) {
+        else if (row[len-1] == 'r') {
 
             if(undo > 0 || possiblyRedo > 0){
 
@@ -298,6 +304,7 @@ int main() {
                     row = NULL;
                     row = (char*)calloc(21, sizeof(char));
                     snprintf(row, 20, "%ldu", undoSet);
+                    len = strlen(row);
 
                     if(redo < 0){
                         possiblyRedo -= redo;
@@ -311,6 +318,7 @@ int main() {
                     row = NULL;
                     row = (char*)calloc(22, sizeof(char));
                     snprintf(row, 21, "%ldr", -(undoSet));
+                    len = strlen(row);
 
                 } else if( undoSet == 0){
 
@@ -322,6 +330,7 @@ int main() {
 
                     row = NULL;
                     row = pendingCommand;
+                    len = strlen(row);
 
                     undo = 0;
                     redo = 0;
@@ -344,6 +353,7 @@ int main() {
 
                 row = NULL;
                 row = pendingCommand;
+                len = strlen(row);
 
                 undo = 0;
                 redo = 0;
@@ -359,6 +369,7 @@ int main() {
         else{
 
             getRow();
+            len = strlen(row);
         }
 
     }
@@ -395,11 +406,13 @@ text_pointer createTextNode(char *x){
 
     return newNode;
 }
-history_pointer createHistoryNode(char *x) {
+history_pointer createHistoryNode(char *x, long ind1, long ind2) {
 
     history_pointer newNode = (history_pointer)malloc(sizeof(struct HistoryNode));
 
-     newNode->value = x;
+    newNode->value = x;
+    newNode->ind1 = ind1;
+    newNode->ind2 = ind2;
     newNode->prev = NULL;
     newNode->next = NULL;
 
@@ -407,9 +420,9 @@ history_pointer createHistoryNode(char *x) {
 }
 
 // DB MANAGING
-void addInHistory() {
+void addInHistory(long ind1, long ind2) {
 
-    history_pointer newNode = createHistoryNode(row);
+    history_pointer newNode = createHistoryNode(row, ind1, ind2);
 
     if(tail_history == NULL){       // se è il primo nodo della cronologia lo aggingo in testa
         head_history = newNode;
@@ -432,17 +445,15 @@ void addToDocument(char *x, long index){
     }
 
     container_pointer element = document[index];
+    text_pointer text = createTextNode(x);
 
     if(element->head_textNode == NULL){
 
-        text_pointer text = createTextNode(x);
         element->index = index;
         element->head_textNode = text;
         element->tail_textNode = text;
     }
     else{
-
-        text_pointer text = createTextNode(x);
 
         element->tail_textNode->next = text;
         text->prev = element->tail_textNode;
@@ -504,7 +515,10 @@ void undoToDocument(long ret){
             continue;
         }
 
-        getBounds(tail_history->value, &ind1, &ind2);
+        //getBounds(tail_history->value, &ind1, &ind2);
+
+        ind1 = tail_history->ind1;
+        ind2 = tail_history->ind2;
 
         long numRow = ind2-ind1+1;
 
@@ -545,22 +559,26 @@ void redoToDocument(long ret){
     for (int i = 0; i < ret; ++i) {
         long ind1, ind2;
 
-        char* historyCommand = NULL;
+        //char* historyCommand = NULL;
+        history_pointer historyCommand = NULL;
 
         if(tail_history == NULL){
 
-            historyCommand = head_history->value;
+            historyCommand = head_history;
         } else{
 
             if(tail_history->next != NULL){
-                historyCommand = tail_history->next->value;
+                historyCommand = tail_history->next;
             } else{
-                historyCommand = tail_history->value;
+                historyCommand = tail_history;
             }
 
         }
 
-        getBounds(historyCommand, &ind1, &ind2);
+        //getBounds(historyCommand, &ind1, &ind2);
+
+        ind1 = historyCommand->ind1;
+        ind2 = historyCommand->ind2;
 
 
         long numRow = ind2-ind1+1;
@@ -569,7 +587,7 @@ void redoToDocument(long ret){
 
         for (int j = 0; j < numRow; ++j) {
 
-            if(historyCommand[3] == 'c'){
+            if(historyCommand->value[3] == 'c'){
 
                 redoChange(ind1+j);
 
@@ -577,7 +595,7 @@ void redoToDocument(long ret){
 
                 if(val != 1){
 
-                    val = redoDelete(ind1, numRow, historyCommand);
+                    val = redoDelete(ind1, numRow, historyCommand->value);
 
                 }
 
@@ -801,10 +819,8 @@ int redoDelete(long treeIndexToRemove, long howMany, char* historyCommand){
 
 // HELPER
 char* getRow(){
-    
-    row = NULL;
 
-    char* tmp = (char *)malloc(sizeof(char) * ROW_LEN);
+    //char* tmp = (char *)malloc(sizeof(char) * ROW_LEN);
 
     char* res = fgets(tmp, ROW_LEN, stdin);     // fgets gets '\n' at the end of the string
 
@@ -820,14 +836,14 @@ char* getRow(){
     strncpy(row, tmp, len);
     strtok(row, "\n");
 
-    free(tmp);
+    //free(tmp);
 
 
     return row;
 }
 void getBounds(char* line, long *ind1, long *ind2){
 
-    long *ret = (long *)malloc(sizeof(long));
+    /*long *ret = (long *)malloc(sizeof(long));
 
     *ret = strtol(line, &line, 10);
     line++;
@@ -835,7 +851,17 @@ void getBounds(char* line, long *ind1, long *ind2){
     *ret = strtol(line, &line, 10);
     *ind2 = *ret;
 
-    free(ret);
+    free(ret);*/
+
+    long ret;
+
+    ret = strtol(line, &line, 10);
+    line++;
+    *ind1 = ret;
+    ret = strtol(line, &line, 10);
+    *ind2 = ret;
+
+    //sscanf(line, "%ld,%ld", ind1, ind2);
 
 }
 
