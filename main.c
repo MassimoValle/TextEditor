@@ -44,6 +44,7 @@ container_pointer document[ARRAY_LEN];
 container_pointer hell[ARRAY_LEN];
 container_pointer heaven[ARRAY_LEN];
 
+long nodeInDocument = 0;
 long nodeInHell = 0;
 long nodeInHeaven = 0;
 char* row;
@@ -90,7 +91,7 @@ void freeHeaven();
 
 
 int main() {
-
+    
     for (int i = 0; i < ARRAY_LEN; ++i) {
         document[i] = NULL;
         hell[i] = NULL;
@@ -452,6 +453,8 @@ void addToDocument(char *x, long index){
         element->index = index;
         element->head_textNode = text;
         element->tail_textNode = text;
+
+        nodeInDocument++;
     }
     else{
 
@@ -465,7 +468,55 @@ void addToDocument(char *x, long index){
 }
 void removeToDocument(long startIndex, long howMany, char* command){
 
-    long iterator = 0;
+    if(document[startIndex] == NULL){          // controllo l'elemento di partenza
+        return;
+    }
+
+    if(document[startIndex]->head_textNode == NULL){          // controllo l'elemento di partenza
+        return;
+    }
+
+    long actuallyRemoved = 0;
+
+
+    for (int i = 0; i < howMany && document[startIndex+i]->head_textNode != NULL; ++i) {       // aggiungo i nodi a hell prima di eliminarli da document
+
+        if(hell[nodeInHell] == NULL){
+            hell[nodeInHell] = createContainer();
+        }
+
+        hell[nodeInHell]->index = startIndex;
+        hell[nodeInHell]->command = command;
+        hell[nodeInHell]->head_textNode = document[startIndex+i]->head_textNode;
+        hell[nodeInHell]->tail_textNode = document[startIndex+i]->tail_textNode;
+
+        nodeInHell++;
+        actuallyRemoved++;
+
+        if(document[startIndex+i+1] == NULL){
+            break;
+        }
+
+    }
+
+    // sposto tutti i nodi successivi in su di actuallyRemoved
+    if(document[startIndex+actuallyRemoved] != NULL)
+        memmove(document[startIndex], document[startIndex+actuallyRemoved], (nodeInDocument-(actuallyRemoved))*sizeof(struct TextNodeContainer*));
+
+    for (int i = 0; i < actuallyRemoved; ++i) { // partendo dall'ultimo nodo, risalgo di actuallyRemoved per metterli a null dato che sono stati spostati in basso
+
+
+        document[nodeInDocument-i]->index = 0;
+        document[nodeInDocument-i]->command = NULL;
+        document[nodeInDocument-i]->head_textNode = NULL;
+        document[nodeInDocument-i]->tail_textNode = NULL;
+
+    }
+
+    nodeInDocument -= actuallyRemoved;
+
+
+    /*long iterator = 0;
 
     if(document[startIndex+iterator] == NULL){          // controllo l'elemento di partenza
         return;
@@ -479,7 +530,7 @@ void removeToDocument(long startIndex, long howMany, char* command){
                 hell[nodeInHell] = createContainer();
             }
 
-            hell[nodeInHell]->index = document[startIndex+iterator]->index-iterator;
+            hell[nodeInHell]->index = startIndex;
             hell[nodeInHell]->command = command;
             hell[nodeInHell]->head_textNode = document[startIndex+iterator]->head_textNode;
             hell[nodeInHell]->tail_textNode = document[startIndex+iterator]->tail_textNode;
@@ -501,7 +552,7 @@ void removeToDocument(long startIndex, long howMany, char* command){
             return;
         }
 
-    }
+    }*/
 
 }
 
