@@ -769,13 +769,8 @@ void redoChange(long ind1, long numRow){
 
                 container_pointer heavenNode = &heaven.containers[nodeInHeaven-numRow+i];
 
-                text_pointer tmp_head = heavenNode->head_textNode;
-                text_pointer tmp_tail = heavenNode->tail_textNode;
-
-                if (tmp_tail == NULL) {
-                    tmp_tail = tmp_head;
-                } else {
-                    tmp_tail = tmp_tail->next;
+                if(heavenNode->tail_textNode == NULL){
+                    heavenNode->tail_textNode = heavenNode->head_textNode;
                 }
 
                 relive[i] = heavenNode;
@@ -861,6 +856,8 @@ void redoChange(long ind1, long numRow){
             free(relive);
             nodeInDocument += relive_count;
             nodeInHeaven -= relive_count;
+
+            return;
 
         }
 
