@@ -3,7 +3,7 @@
 #include <string.h>
 
 #define ROW_LEN 1024
-#define ALLOC_INCREMENT 300
+#define ALLOC_INCREMENT 80000
 
 typedef struct TextNode* text_pointer;
 typedef struct TextNodeContainer* container_pointer;
@@ -81,10 +81,10 @@ void removeToDocument(long startIndex, long howMany, char* command);
 void undoToDocument(long ret);
 void redoToDocument(long ret);
 
-int undoChange(long num);
-int undoDelete(long numRow);
-void redoChange(long num);
-int redoDelete(long treeIndexToRemove, long howMany, char* historyCommand);
+void undoChange(long num, long numRow);
+void undoDelete(long numRow);
+void redoChange(long ind1, long numRow);
+void redoDelete(long treeIndexToRemove, long howMany, char* historyCommand, long numRow);
 
 // HELPER
 char* getRow();
@@ -560,32 +560,16 @@ void undoToDocument(long ret){
 
         long numRow = ind2-ind1+1;
 
-        int val = 0;
 
-        for (int j = 0; j < numRow; ++j) {
+        if(tail_history->value[3] == 'c'){
 
-            if(tail_history->value[3] == 'c'){
-
-                val = undoChange(ind1+j);
-
-                if(val == 0){
-                    continue;
-                }
+            undoChange(ind1, numRow);
 
 
-            } else{
+        } else{
 
-                if(val == 2){
-                    val = undoDelete(0);
-                } else{
-                    val = undoDelete(numRow);
-                }
+            undoDelete(numRow);
 
-                if(val == 0){
-                    continue;
-                }
-
-            }
         }
 
         tail_history = tail_history->prev;
@@ -620,25 +604,19 @@ void redoToDocument(long ret){
 
         long numRow = ind2-ind1+1;
 
-        long val = 0;
 
-        for (int j = 0; j < numRow; ++j) {
 
-            if(historyCommand->value[3] == 'c'){
+        if(historyCommand->value[3] == 'c'){
 
-                redoChange(ind1+j);
+            redoChange(ind1, numRow);
 
-            } else{
+        } else{
 
-                if(val != 1){
+            redoDelete(ind1, numRow, historyCommand->value, numRow);
 
-                    val = redoDelete(ind1, numRow, historyCommand->value);
-
-                }
-
-            }
 
         }
+
 
         if(tail_history != NULL){
             tail_history = tail_history->next;
@@ -648,97 +626,69 @@ void redoToDocument(long ret){
 
 }
 
-int undoChange(long num) {
+void undoChange(long num, long numRow) {
 
-    container_pointer c = &document.containers[num];    // document[num] deve esserci per forza per poter fare una undoChange
+    for (int j = 0; j < numRow; ++j) {
 
-    if (c->tail_textNode == NULL) {     // se annullo l'istruzione che ha creato quel nodo
-        return 0;
-    } else {
-        c->tail_textNode = c->tail_textNode->prev;
-        return 1;
+        container_pointer c = &document.containers[num+j];    // document[num] deve esserci per forza per poter fare una undoChange
+
+        if (c->tail_textNode == NULL) {     // se annullo l'istruzione che ha creato quel nodo
+            continue;
+        } else {
+            c->tail_textNode = c->tail_textNode->prev;
+            if(c->tail_textNode == NULL) nodeInDocument--;
+        }
     }
 }
-int undoDelete(long numRow){
+void undoDelete(long numRow){
 
-    // il nodo è stato eliminato, devo rimetterlo nel documento
-
-    int ret = 1;
-
+    // numRow nodi sono stati eliminati, devo rimetterli nel documento
 
     if(nodeInHell-1 < 0){
-        return 0;
+        return;
     }
 
-    if((&hell.containers[nodeInHell-1])->command != tail_history->value){
-        return 0;
+    container_pointer* relive = (container_pointer* )calloc(numRow, sizeof(struct TextNodeContainer));
+    long relive_count = 0;
+
+    for (int i = 0; i < numRow; ++i) {
+
+        if(nodeInHell-numRow+i < 0) continue;
+
+        container_pointer hellNode = &hell.containers[nodeInHell-numRow+i];
+
+        if(hellNode->command == tail_history->value){
+
+            relive[relive_count] = hellNode;
+            relive_count++;
+
+           hellNode = NULL;
+
+        }
+
     }
 
-    container_pointer r = &hell.containers[nodeInHell-1];   // hell[nodeInHell-1] deve esserci per forza per poter fare una undoDelete
-    long r_index = r->index;
+    if(relive_count == 0){
+        free(relive);
+        return;
+    }
 
+    long r_index = relive[0]->index;
 
     if((&document.containers[r_index])->tail_textNode != NULL){   // prendo l'elemento al quale rimpiazzare r
 
         long size = nodeInDocument;
 
-        if(r_index+1+size > document.dim){
+        if(r_index+relive_count+size > document.dim){
             reallocMem(&document);
         }
 
-        container_pointer dest = &document.containers[r_index+1];
+        container_pointer dest = &document.containers[r_index+relive_count];
         container_pointer src = &document.containers[r_index];
 
+         memmove(dest, src, size*sizeof(struct TextNodeContainer)); // spingo tutto in giù
 
-         memmove(dest, src, size*sizeof(struct TextNodeContainer));
-
-        (&document.containers[r_index])->head_textNode = r->head_textNode;    // assegno le componenti di r all'elemento
-        (&document.containers[r_index])->tail_textNode = r->tail_textNode;
-
-
-        /*
-
-        text_pointer tmp_head = (&document.containers[r_index])->head_textNode;   // mi salvo le sue componenti
-        text_pointer tmp_tail = (&document.containers[r_index])->tail_textNode;
-
-        (&document.containers[r_index])->head_textNode = r->head_textNode;    // assegno le componenti di r all'elemento
-        (&document.containers[r_index])->tail_textNode = r->tail_textNode;
-
-
-        long iterator = r_index+1;
-
-
-        if(document[iterator] == NULL){                 // se non ci sono elementi dopo r_index nel documento
-            document[iterator] = createContainer();
-        }
-
-        while (document[iterator]->head_textNode != NULL) { // in modo che questo non dia errore
-
-            text_pointer tmp_head_2 = document[iterator]->head_textNode;
-            text_pointer tmp_tail_2 = document[iterator]->tail_textNode;
-
-            document[iterator]->head_textNode = tmp_head;
-            document[iterator]->tail_textNode = tmp_tail;
-
-            tmp_head = tmp_head_2;
-            tmp_tail = tmp_tail_2;
-
-            iterator++;
-
-
-            if(document[iterator] == NULL){
-                document[iterator] = createContainer();
-            }
-
-        }
-
-        if(document[iterator] == NULL){
-            document[iterator] = createContainer();
-        }
-
-        document[iterator]->head_textNode = tmp_head;
-        document[iterator]->tail_textNode = tmp_tail;
-        */
+         memmove(src, *relive, relive_count*sizeof(struct TextNodeContainer));   // copio i container di relive in document all'indice src
 
     }
 
@@ -747,7 +697,7 @@ int undoDelete(long numRow){
         if((&document.containers[r_index])->head_textNode != NULL){   // se head==NULL significa che devo aggiungere un elemento ad heaven
 
 
-            long actuallyRemoved = 0;
+            //long actuallyRemoved = 0;
 
 
             for (int i = 0; i < numRow && (&document.containers[r_index+i])->head_textNode != NULL; ++i) {       // aggiungo i nodi a hell prima di eliminarli da document
@@ -758,114 +708,123 @@ int undoDelete(long numRow){
 
                 }
 
+                container_pointer docNode = &document.containers[r_index+i];
+
                 (&heaven.containers[nodeInHeaven])->index = r_index;
-                (&heaven.containers[nodeInHeaven])->head_textNode = (&document.containers[r_index+i])->head_textNode;
-                (&heaven.containers[nodeInHeaven])->tail_textNode = (&document.containers[r_index+i])->tail_textNode;
+                (&heaven.containers[nodeInHeaven])->head_textNode = docNode->head_textNode;
+                (&heaven.containers[nodeInHeaven])->tail_textNode = docNode->tail_textNode;
+
+                docNode->index = 0;
+                docNode->command = NULL;
+                docNode->head_textNode = NULL;
+                docNode->tail_textNode = NULL;
 
                 nodeInHeaven++;
-                actuallyRemoved++;
+                //actuallyRemoved++;
 
             }
 
-            nodeInDocument -= actuallyRemoved;
+            //nodeInDocument -= actuallyRemoved;
 
-            /*
-            int i = 0;
-            //for (int i = 0; i < numRow; ++i) {
-            while(document[r_index+i]->head_textNode != NULL && document[r_index+i]->tail_textNode == NULL){
-
-                if(heaven[nodeInHeaven] == NULL){
-                    heaven[nodeInHeaven] = createContainer();
-                }
-
-                heaven[nodeInHeaven]->index = document[r_index+i]->index-i;
-                heaven[nodeInHeaven]->head_textNode = document[r_index+i]->head_textNode;
-                heaven[nodeInHeaven]->tail_textNode = document[r_index+i]->tail_textNode;
-
-                document[r_index+i]->head_textNode = NULL;
-                document[r_index+i]->tail_textNode = NULL;
-
-                nodeInHeaven++;
-                i++;
-
-                if(document[r_index+i] == NULL){
-                    document[r_index+i] = createContainer();
-                }
-
-            }
-            */
-
-            ret = 2;
 
         }
 
-        /*if(&document.containers[r_index] == NULL){
-            document.containers[r_index] = createContainer();
-        }*/
-
-        (&document.containers[r_index])->head_textNode = r->head_textNode;
-        (&document.containers[r_index])->tail_textNode = r->tail_textNode;
+        memmove(&document.containers[r_index], *relive, relive_count*sizeof(struct TextNodeContainer));
 
     }
 
-    r->index = 0;
-    r->command = NULL;
-    r->head_textNode = NULL;
-    r->tail_textNode = NULL;
+    free(relive);
+    nodeInDocument += relive_count;
+    nodeInHell -= relive_count;
 
-    nodeInDocument++;
-    nodeInHell--;
 
-    return ret;
 
 }
 
-void redoChange(long num){
+void redoChange(long ind1, long numRow){
 
-        container_pointer container = &document.containers[num];    // a logica dovrebbe essere stato inizializzato il container se provo a farci su una redoChange
+    for (int j = 0; j < numRow; ++j) {
 
-        if(container->head_textNode != NULL){
+        container_pointer container = &document.containers[ind1+j];    // a logica dovrebbe essere stato inizializzato il container se provo a farci su una redoChange
 
-            if(container->tail_textNode == NULL){
+        if (container->head_textNode != NULL) {
+
+            if (container->tail_textNode == NULL) {
 
                 container->tail_textNode = container->head_textNode;
-            } else{
+                nodeInDocument++;
+            } else {
 
                 container->tail_textNode = container->tail_textNode->next;
             }
 
-        }
-        else{
+        } else {
 
-            container_pointer heavenNode = &heaven.containers[nodeInHeaven-1];
+            container_pointer* relive = (container_pointer* )calloc(numRow, sizeof(struct TextNodeContainer));
+            long relive_count = 0;
+
+            for (int i = 0; i < numRow; ++i) {
+
+                if(nodeInHeaven-numRow+i < 0) continue;
+
+                container_pointer heavenNode = &heaven.containers[nodeInHeaven-numRow+i];
+
+                text_pointer tmp_head = heavenNode->head_textNode;
+                text_pointer tmp_tail = heavenNode->tail_textNode;
+
+                if (tmp_tail == NULL) {
+                    tmp_tail = tmp_head;
+                } else {
+                    tmp_tail = tmp_tail->next;
+                }
+
+                relive[i] = heavenNode;
+                relive_count++;
+
+                heavenNode = NULL;
+
+
+            }
+
+            if(relive_count == 0){
+                free(relive);
+                return;
+            }
+
+            long key = relive[0]->index;
+
+            /*container_pointer heavenNode = &heaven.containers[nodeInHeaven - 1];
             long key = heavenNode->index;
 
             text_pointer tmp_head = heavenNode->head_textNode;
             text_pointer tmp_tail = heavenNode->tail_textNode;
 
-            if(tmp_tail == NULL){
+            if (tmp_tail == NULL) {
                 tmp_tail = tmp_head;
-            } else{
+            } else {
                 tmp_tail = tmp_tail->next;
-            }
+            }*/
 
 
             /*if(document.containers[key] == NULL){
                 document[key] = createContainer();
             }*/
 
-            container_pointer dest = &document.containers[key+1];
+            container_pointer dest = &document.containers[key + relive_count];
             container_pointer src = &document.containers[key];
             long size = nodeInDocument;
 
-            memmove(dest, src, size*sizeof(struct TextNodeContainer));
+            memmove(dest, src, size * sizeof(struct TextNodeContainer));
 
-            (&document.containers[key])->head_textNode = tmp_head;
+            memmove(src, *relive, relive_count*sizeof(struct TextNodeContainer));   // copio i container di relive in document all'indice src
+
+
+            /*(&document.containers[key])->head_textNode = tmp_head;
             (&document.containers[key])->tail_textNode = tmp_tail;
 
 
 
-            /*while (document[key]->head_textNode != NULL) {
+            while (document[key]->head_textNode != NULL) {
 
                 text_pointer tmp_head_2 = document[key]->head_textNode;
                 text_pointer tmp_tail_2 = document[key]->tail_textNode;
@@ -892,23 +851,31 @@ void redoChange(long num){
             (&document.containers[key])->tail_textNode = tmp_tail;
             */
 
-            heavenNode->index = 0;
+            /*heavenNode->index = 0;
             heavenNode->head_textNode = NULL;
             heavenNode->tail_textNode = NULL;
 
             nodeInDocument++;
-            nodeInHeaven--;
+            nodeInHeaven--;*/
+
+            free(relive);
+            nodeInDocument += relive_count;
+            nodeInHeaven -= relive_count;
 
         }
 
-}
-int redoDelete(long treeIndexToRemove, long howMany, char* historyCommand){
-
-    if((&document.containers[treeIndexToRemove])->tail_textNode != NULL){   // da controllare
-        removeToDocument(treeIndexToRemove, howMany, historyCommand);
     }
 
-    return 1;
+}
+void redoDelete(long treeIndexToRemove, long howMany, char* historyCommand, long numRow){
+
+    //for (int j = 0; j < numRow; ++j) {
+
+        if ((&document.containers[treeIndexToRemove])->tail_textNode != NULL) {   // da controllare
+            removeToDocument(treeIndexToRemove, howMany, historyCommand);
+        }
+
+    //}
 
 }
 
