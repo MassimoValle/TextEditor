@@ -4,7 +4,7 @@
 #include <stdbool.h>
 
 #define ROW_LEN 1024
-#define ALLOC_INCREMENT 1
+#define ALLOC_INCREMENT 1000
 
 
 typedef struct HistoryNode* history_pointer;
@@ -46,6 +46,8 @@ long nodeInDocument = 0;            // nodi validi nel documento (indice 0 esclu
 string_ptr row;                     // riga attuale presa da stdin
 char tmp[1024];                     // helper per tagliare la stringa
 
+
+//#### VARIABILI USATE PER RAGGRUPPARE LE UNDO E REDO ####//
 long undo = 0;                      // indica quanti comandi di undo si ha inserito
 long redo = 0;                      // indica quanti comandi di redo si ha inserito
 
@@ -54,10 +56,11 @@ long possiblyRedo = 0;              // indica quante redo è possibile effettuar
 bool doUndo = 0;
 bool doRedo = 0;
 int undoOrRedoDone = 0;
+//#########################################################//
 
 bool savePendingState = true;
-string_ptr pendingCommand;
-history_pointer pendingState;
+string_ptr pendingCommand = NULL;
+history_pointer pendingState = NULL;
 
 
 // CREATE NODES
@@ -99,9 +102,12 @@ int main() {
     tail_history->rowModified = document.containers;
     tail_history->copy = true;
 
+
+
     // start program
 
     bool exit = false;
+
     row = getRow();
     unsigned long len = strlen(row);
 
@@ -122,7 +128,6 @@ int main() {
 
             if(exit == false) {
 
-                pendingState = NULL;
                 long ind1 = 0, ind2 = 0;
 
                 getBounds(row, &ind1, &ind2);       // prendo gli indici del comando
@@ -155,7 +160,6 @@ int main() {
 
             if(exit == false) {
 
-                pendingState = NULL;
                 long ind1, ind2;
                 getBounds(row, &ind1, &ind2);
 
@@ -169,7 +173,6 @@ int main() {
         else if (row[len-1] == 'p') {
 
             if(undo > 0 || redo > 0){       // mi serve per la undo/redo
-
 
                 if(pendingCommand == NULL) savePendingState = true;
 
@@ -185,7 +188,7 @@ int main() {
                 long ind1, ind2;
                 getBounds(row, &ind1, &ind2);
 
-                free(row);
+                free(row);      // non mi serve salvarmi il comando di print
 
 
                 if (ind2 == 0) {
@@ -220,7 +223,7 @@ int main() {
             string_ptr q;
             long ret = strtol(row, &q, 10);
 
-            free(row);
+            free(row);      // non mi serve salvarmi il comando di undo
 
             if(doUndo == true){
 
@@ -246,7 +249,7 @@ int main() {
                 string_ptr q;
                 long ret = strtol(row, &q, 10);
 
-                free(row);
+                free(row);      // non mi serve salvarmi il comando di redo
 
                 if(doRedo == true){
 
@@ -269,8 +272,6 @@ int main() {
                             redo = possiblyRedo + undo;
                         }
                     }
-
-
 
                 }
 
@@ -333,6 +334,7 @@ int main() {
                     if(strstr(pendingCommand, "p") == NULL){    // se il comando non è una print
                         possiblyRedo = 0;
                         pendingCommand = NULL;
+                        pendingState = NULL;
                     }
 
                     undo = 0;
@@ -352,9 +354,10 @@ int main() {
                 row = pendingCommand;
                 len = strlen(row);
 
-                if(strstr(pendingCommand, "p") == NULL){    // se il comando non è una print
+                if(strstr(pendingCommand, "p") == NULL){    // se il comando non è una print (non contiene la lettera p)
                     possiblyRedo = 0;
                     pendingCommand = NULL;
+                    pendingState = NULL;
                 }
 
                 undo = 0;
@@ -422,7 +425,12 @@ void initPendingState(){    // salva l'ultimo stato raggiunto dal programma
     pendingState->rowModified = (array_string_ptr ) calloc(1+nodeInDocument, sizeof(string_ptr));
 
     // copio lo stato attuale
-    memcpy(pendingState->rowModified, document.containers, (1 + nodeInDocument) * sizeof(string_ptr));
+    if(document.containers == NULL){
+        pendingState->rowModified = NULL;
+    } else{
+        memcpy(pendingState->rowModified, document.containers, (1 + nodeInDocument) * sizeof(string_ptr));
+    }
+
     pendingState->copy = true;
 
 }
@@ -479,13 +487,7 @@ void addToDocument(long ind1, long numRow){
 
         getRow();
 
-        /*if (key > document.dim-1) {     // se l'indice a cui voglio inserire la riga va oltre lo spazio allocato per document
-
-            allocMem(&document);
-
-        }*/
-
-        if(key > nodeInDocument-1){
+        if(key > nodeInDocument-1){     // se voglio scrivere in un nodo che non è ancora stato allocato
             allocMem(&document);
         }
 
@@ -614,9 +616,10 @@ void undoChange(){
         for (int i = 0; i < tail_history->numRow; ++i) {
 
             document.containers[startIndex+i] = NULL;
-            nodeInDocument--;
 
         }
+
+        nodeInDocument-= tail_history->numRow;
 
     }
 
@@ -645,12 +648,14 @@ void redoChange(){
 
         }
 
+        nodeInDocument += tail_history->numRow;
+
     }
 
 }
 void redoDelete(){
 
-    document.containers = tail_history->next->rowModified;    // ripristino la versione precendente alla delete
+    document.containers = tail_history->next->rowModified;    // ripristino la versione successiva alla delete
 
     nodeInDocument = tail_history->next->numRow;
 }
