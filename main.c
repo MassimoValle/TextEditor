@@ -4,7 +4,7 @@
 #include <stdbool.h>
 
 #define ROW_LEN 1024
-#define ALLOC_INCREMENT 1000
+#define ALLOC_INCREMENT 1
 
 
 typedef struct HistoryNode* history_pointer;
@@ -13,42 +13,46 @@ typedef char** array_string_ptr;
 
 // HISTORY STRUCT
 struct HistoryNode {
-    string_ptr value;
+    string_ptr value;   // comando
     long ind1;
     long ind2;
-    array_string_ptr rowModified;
-    long numRow;
-    bool copy;
+
+    array_string_ptr rowModified;   // array salvato in caso di modifica di una o più stringhe, o righe aggiunte
+    long numRow;    // numero di righe se cui ha avuto effetto la modifica
+    bool copy;      // true se ho salvato una copia dell'array (caso in cui ho modificato almeno un nodo)
+
     history_pointer next;
     history_pointer prev;
 
 };  // used for commands history
 
 struct DynamicArray {
-    long dim;
-    array_string_ptr containers;
+
+    long dim;                       // dimensione allocata in memoria
+    array_string_ptr containers;    // array di stringhe
+
 };
 
 
 // GLOBAL VAR HISTORY
-history_pointer head_history;
-history_pointer tail_history;
+history_pointer head_history;       // punta il primo comando della cronologia
+history_pointer tail_history;       // punta il primo comando effettivo della cronologia
 
 
 
 struct DynamicArray document;
-long nodeInDocument = 0;    // nodi validi nel documento (indice 0 escluso)
+long nodeInDocument = 0;            // nodi validi nel documento (indice 0 escluso)
 
-string_ptr row;
-char tmp[1024];
+string_ptr row;                     // riga attuale presa da stdin
+char tmp[1024];                     // helper per tagliare la stringa
 
-long undo = 0;
-long redo = 0;
+long undo = 0;                      // indica quanti comandi di undo si ha inserito
+long redo = 0;                      // indica quanti comandi di redo si ha inserito
 
-long possiblyUndo = 0;
-long possiblyRedo = 0;
-long doUndo = 0;
-long doRedo = 0;
+long possiblyUndo = 0;              // indica quante undo è possibile effettuare
+long possiblyRedo = 0;              // indica quante redo è possibile effettuare
+bool doUndo = 0;
+bool doRedo = 0;
 int undoOrRedoDone = 0;
 
 bool savePendingState = true;
@@ -57,12 +61,14 @@ history_pointer pendingState;
 
 
 // CREATE NODES
+void allocMem(struct DynamicArray* array);
 history_pointer createHistoryNode(string_ptr x, long ind1, long ind2);
+void initPendingState();
 
 // DB MANAGING
 void addInHistory(long ind1, long ind2, bool zero);
-void addToDocument(long ind1, long numRow, bool save);
-void removeToDocument(long startIndex, long howMany, bool save);
+void addToDocument(long ind1, long numRow);
+void removeToDocument(long startIndex, long howMany);
 
 void undoToDocument(long ret);
 void redoToDocument(long ret);
@@ -70,14 +76,11 @@ void redoToDocument(long ret);
 void undoChange();
 void undoDelete();
 void redoChange();
-void redoDelete(long startIndex, long numRow);
+void redoDelete();
 
 // HELPER
 string_ptr getRow();
 void getBounds(string_ptr line, long *ind1, long *ind2);
-
-
-void allocMem(struct DynamicArray* array);
 
 
 
@@ -98,7 +101,7 @@ int main() {
 
     // start program
 
-    int exit = 0;
+    bool exit = false;
     row = getRow();
     unsigned long len = strlen(row);
 
@@ -111,14 +114,15 @@ int main() {
 
                 pendingCommand = row;
                 savePendingState = true;
-                doUndo = 1;
-                doRedo = 1;
-                exit = 1;
+                doUndo = true;
+                doRedo = true;
+                exit = true;
 
             }
 
-            if(exit != 1) {
+            if(exit == false) {
 
+                pendingState = NULL;
                 long ind1 = 0, ind2 = 0;
 
                 getBounds(row, &ind1, &ind2);       // prendo gli indici del comando
@@ -126,7 +130,7 @@ int main() {
                 long numRow = ind2 - ind1 + 1;
                 addInHistory(ind1, ind2, false);                     // aggiungo il comando alla cronologia
 
-                addToDocument(ind1, numRow, true);     // aggiungo all'albero al la stringa(row) all'indice key
+                addToDocument(ind1, numRow);     // aggiungo all'albero al la stringa(row) all'indice key
 
                 getRow();
                 len = strlen(row);
@@ -143,21 +147,22 @@ int main() {
 
                 pendingCommand = row;
                 savePendingState = true;
-                doUndo = 1;
-                doRedo = 1;
-                exit = 1;
+                doUndo = true;
+                doRedo = true;
+                exit = true;
 
             }
 
-            if(exit != 1) {
+            if(exit == false) {
 
+                pendingState = NULL;
                 long ind1, ind2;
                 getBounds(row, &ind1, &ind2);
 
                 long numRow = ind2 - ind1 + 1;
                 addInHistory(ind1, ind2, false);             // aggiungo il comando alla cronologia
 
-                removeToDocument(ind1, numRow, true);
+                removeToDocument(ind1, numRow);
             }
 
         }
@@ -165,14 +170,17 @@ int main() {
 
             if(undo > 0 || redo > 0){       // mi serve per la undo/redo
 
+
+                if(pendingCommand == NULL) savePendingState = true;
+
                 pendingCommand = row;
-                doUndo = 1;
-                doRedo = 1;
-                exit = 1;
+                doUndo = true;
+                doRedo = true;
+                exit = true;
 
             }
 
-            if(exit != 1) {
+            if(exit == false) {
 
                 long ind1, ind2;
                 getBounds(row, &ind1, &ind2);
@@ -214,7 +222,7 @@ int main() {
 
             free(row);
 
-            if(doUndo == 1){
+            if(doUndo == true){
 
                 undoToDocument(ret);
                 possiblyUndo -= ret;
@@ -240,7 +248,7 @@ int main() {
 
                 free(row);
 
-                if(doRedo == 1){
+                if(doRedo == true){
 
                     redoToDocument(ret);
                     undoOrRedoDone = 1;
@@ -273,7 +281,7 @@ int main() {
 
         }
 
-        if(doUndo == 1){
+        if(doUndo == true){
 
             if(undoOrRedoDone == 0){
 
@@ -318,47 +326,45 @@ int main() {
 
                 } else if( undoSet == 0){
 
-                    if(strstr(pendingCommand, "p") == NULL){    // se il comando non è una print
-                        //freeDocument();
-                        //freeHeaven();
-                        possiblyRedo = 0;
-                    }
-
                     row = NULL;
                     row = pendingCommand;
                     len = strlen(row);
 
+                    if(strstr(pendingCommand, "p") == NULL){    // se il comando non è una print
+                        possiblyRedo = 0;
+                        pendingCommand = NULL;
+                    }
+
                     undo = 0;
                     redo = 0;
 
-                    doUndo = 0;
-                    doRedo = 0;
+                    doUndo = false;
+                    doRedo = false;
                     undoOrRedoDone = 0;
 
-                    exit = 0;
+                    exit = false;
 
                 }
             }
             else{
 
-                if(strstr(pendingCommand, "p") == NULL){    // se il comando non è una print
-                    //freeDocument();
-                    //freeHeaven();
-                    possiblyRedo = 0;
-                }
-
                 row = NULL;
                 row = pendingCommand;
                 len = strlen(row);
 
+                if(strstr(pendingCommand, "p") == NULL){    // se il comando non è una print
+                    possiblyRedo = 0;
+                    pendingCommand = NULL;
+                }
+
                 undo = 0;
                 redo = 0;
 
-                doUndo = 0;
-                doRedo = 0;
+                doUndo = false;
+                doRedo = false;
                 undoOrRedoDone = 0;
 
-                exit = 0;
+                exit = false;
             }
 
         }
@@ -380,6 +386,17 @@ int main() {
 
 
 // CREATE NODES
+void allocMem(struct DynamicArray* array){  // alloco nuova memoria ad array
+
+    (*array).dim += ALLOC_INCREMENT;
+    (*array).containers = (array_string_ptr)realloc((*array).containers, (*array).dim * sizeof(string_ptr));
+
+    for (long i = (*array).dim-ALLOC_INCREMENT; i < (*array).dim; ++i) {
+
+        (*array).containers[i] = NULL;
+    }
+
+}
 history_pointer createHistoryNode(string_ptr x, long ind1, long ind2) {
 
     history_pointer newNode = (history_pointer)malloc(sizeof(struct HistoryNode));
@@ -410,6 +427,7 @@ void initPendingState(){    // salva l'ultimo stato raggiunto dal programma
 
 }
 
+
 // DB MANAGING
 void addInHistory(long ind1, long ind2, bool zero) {
 
@@ -432,12 +450,11 @@ void addInHistory(long ind1, long ind2, bool zero) {
 }
 
 
-void addToDocument(long ind1, long numRow, bool save){
+void addToDocument(long ind1, long numRow){
 
     bool modify = false;    // indica se è una change che modifica o se solo aggiunge
 
     if(ind1 <= nodeInDocument){// se sto andando a modificare qualcosa allora devo salvare lo salvo
-        if (save) {
 
             tail_history->numRow = nodeInDocument;
             tail_history->rowModified = (array_string_ptr ) calloc(1+nodeInDocument, sizeof(string_ptr));
@@ -446,8 +463,6 @@ void addToDocument(long ind1, long numRow, bool save){
 
             tail_history->copy = true;
             modify = true;
-
-        }
 
     } else{ // se vado ad aggiungere dei nodi solamente
 
@@ -464,10 +479,14 @@ void addToDocument(long ind1, long numRow, bool save){
 
         getRow();
 
-        if (key > document.dim-1) {     // se l'indice a cui voglio inserire la riga va oltre lo spazio allocato per document
+        /*if (key > document.dim-1) {     // se l'indice a cui voglio inserire la riga va oltre lo spazio allocato per document
 
             allocMem(&document);
 
+        }*/
+
+        if(key > nodeInDocument-1){
+            allocMem(&document);
         }
 
         if (document.containers[key] == NULL) { // se è un nodo nuovo...
@@ -486,7 +505,7 @@ void addToDocument(long ind1, long numRow, bool save){
     }
 
 }
-void removeToDocument(long startIndex, long howMany, _Bool save){
+void removeToDocument(long startIndex, long howMany){
 
     if(startIndex > nodeInDocument){    // se provo ad eliminare un nodo che non esiste
         return;
@@ -497,14 +516,12 @@ void removeToDocument(long startIndex, long howMany, _Bool save){
         howMany = (nodeInDocument-startIndex+1);      // calcolo quanti nodi effettivamente posso cancellare
     }
 
-    if(save){       // se devo salvare lo stato (delete semplice)
-        tail_history->numRow = nodeInDocument;
-        tail_history->rowModified = (array_string_ptr ) calloc(1+nodeInDocument, sizeof(string_ptr));
+    tail_history->numRow = nodeInDocument;
+    tail_history->rowModified = (array_string_ptr ) calloc(1+nodeInDocument, sizeof(string_ptr));
 
-        memcpy(tail_history->rowModified, document.containers, (1+nodeInDocument)*sizeof(string_ptr));
+    memcpy(tail_history->rowModified, document.containers, (1+nodeInDocument)*sizeof(string_ptr));
 
-        tail_history->copy = true;
-    }
+    tail_history->copy = true;
 
 
     for (int i = 0; i < nodeInDocument-howMany; ++i) {  // traslo tutto in giù di howMany
@@ -518,14 +535,6 @@ void removeToDocument(long startIndex, long howMany, _Bool save){
         document.containers[nodeInDocument-i] = NULL;
     }
 
-    string_ptr debug0 = document.containers[0];
-    string_ptr debug1 = document.containers[1];
-    string_ptr debug2 = document.containers[2];
-
-    string_ptr tdebug0 = tail_history->rowModified[0];
-    string_ptr tdebug1 = tail_history->rowModified[1];
-    string_ptr tdebug2 = tail_history->rowModified[2];
-
     nodeInDocument -= howMany;
 
 }
@@ -533,22 +542,17 @@ void removeToDocument(long startIndex, long howMany, _Bool save){
 
 void undoToDocument(long ret){
 
-    if(savePendingState == true){
-        initPendingState();
+    if(savePendingState == true){       // salvo lo stato in tutti i casi tranne quando faccio undo tramite il comandi print
+        initPendingState();             // e poi faccio ancora delle undo tramite un'altro comando di print
         savePendingState = false;
     }
 
 
-    for (int i = 0; i < ret; ++i) {
-
-        if(tail_history == NULL){
-            continue;
-        }
+    for (int i = 0; i < ret; ++i) {         // svolgo le undo
 
         if(tail_history->value[3] == 'c'){
 
             undoChange();
-
 
         } else{
 
@@ -565,38 +569,31 @@ void redoToDocument(long ret){
     for (int i = 0; i < ret; ++i) {
 
         if(tail_history == NULL){
-            tail_history = head_history;
-            //continue;
+            tail_history = head_history;    // non dovrebbe mai verificarsi se ho gestito bene i contatori di undo/redo nel main
+
+        } else{
+            tail_history = tail_history->next;      // porto subito avanti la coda perchè altrimenti andrei a fare la stessa cosa che ha fatto l'ultima undo
+
+            if(tail_history->next == NULL){   // se lo stato successivo è pendingState (ho rifatto tante redo quante undo fatte prima)
+
+                document.containers = pendingState->rowModified;
+                nodeInDocument = pendingState->numRow;
+
+                continue;   // skippo perchè non devo gestirlo
+
+            }
+
         }
 
-        if(tail_history->next == NULL){   // se lo stato successivo è pendingState (ho rifatto tante redo quante undo fatte prima)
 
-            document.containers = pendingState->rowModified;
-            nodeInDocument = pendingState->numRow;
-
-            string_ptr debug0 = document.containers[0];
-            string_ptr debug1 = document.containers[1];
-            string_ptr debug2 = document.containers[2];
-
-        }
-
-        if(tail_history->next->value[3] == 'c'){
+        if(tail_history->value[3] == 'c'){
 
             redoChange();
 
         } else{
 
-            long ind1 = tail_history->next->ind1;
-            long ind2 = tail_history->next->ind2;
+            redoDelete();
 
-            long numRow = ind2-ind1+1;
-
-            redoDelete(ind1, numRow);
-
-        }
-
-        if(tail_history->next != NULL){
-            tail_history = tail_history->next;
         }
 
     }
@@ -605,15 +602,6 @@ void redoToDocument(long ret){
 
 
 void undoChange(){
-
-    string_ptr debug0 = document.containers[0];
-    string_ptr debug1 = document.containers[1];
-    string_ptr debug2 = document.containers[2];
-
-    string_ptr tdebug0 = tail_history->rowModified[0];
-    string_ptr tdebug1 = tail_history->rowModified[1];
-    string_ptr tdebug2 = tail_history->rowModified[2];
-
 
     if(tail_history->copy){     // se avevo modificato dei nodi
 
@@ -635,56 +623,39 @@ void undoChange(){
 }
 void undoDelete() {
 
-    if(nodeInDocument > 0){
-        string_ptr debug0 = document.containers[0];
-        string_ptr debug1 = document.containers[1];
-        string_ptr debug2 = document.containers[2];
-    }
-
-
     document.containers = tail_history->rowModified;    // ripristino la versione precendente alla delete
 
     nodeInDocument = tail_history->numRow;
-
-    if(nodeInDocument > 0)
-    {
-        string_ptr debug0 = document.containers[0];
-        string_ptr debug1 = document.containers[1];
-        string_ptr debug2 = document.containers[2];
-    }
-
 
 }
 
 void redoChange(){
 
-    if(tail_history->next->copy) {    // se avevo modificato dei nodi devo andare allo stato successivo
+    if(tail_history->copy) {    // se avevo modificato dei nodi devo andare allo stato successivo
 
-        document.containers = tail_history->next->next->rowModified;
-        nodeInDocument = tail_history->next->next->numRow;
-
-        string_ptr debug0 = document.containers[0];
-        string_ptr debug1 = document.containers[1];
-        string_ptr debug2 = document.containers[2];
+        document.containers = tail_history->next->rowModified;
+        nodeInDocument = tail_history->next->numRow;
 
     } else{     // se avevo aggiunto dei nodi li ripristino prendendoli dalla rowModified
 
-        long startIndex = tail_history->next->ind1;
-        for (int i = 0; i < tail_history->next->numRow; ++i) {
+        long startIndex = tail_history->ind1;
+        for (int i = 0; i < tail_history->numRow; ++i) {
 
-            document.containers[startIndex+i] = tail_history->next->rowModified[i];
+            document.containers[startIndex+i] = tail_history->rowModified[i];
 
         }
 
     }
 
-
 }
-void redoDelete(long startIndex, long numRow){
+void redoDelete(){
 
-    removeToDocument(startIndex, numRow, false);    // rifaccio la delete senza però salvare nella history il document
+    document.containers = tail_history->next->rowModified;    // ripristino la versione precendente alla delete
 
+    nodeInDocument = tail_history->next->numRow;
 }
+
+
 
 // HELPER
 string_ptr getRow(){
@@ -714,18 +685,5 @@ void getBounds(string_ptr line, long *ind1, long *ind2){
     *ind1 = ret;
     ret = strtol(line, &line, 10);
     *ind2 = ret;
-
-}
-
-
-void allocMem(struct DynamicArray* array){  // alloco nuova memoria ad array
-
-    (*array).dim += ALLOC_INCREMENT;
-    (*array).containers = (array_string_ptr)realloc((*array).containers, (*array).dim * sizeof(string_ptr));
-
-    for (long i = (*array).dim-ALLOC_INCREMENT; i < (*array).dim; ++i) {
-
-        (*array).containers[i] = NULL;
-    }
 
 }
