@@ -207,6 +207,8 @@ int main() {
                     if(ind1+i > nodeInDocument){
                         printf(".\n");
                     } else{
+
+
                         string_ptr string = document.containers[ind1+i];
 
                         if(string == NULL || strcmp(string, "") == 0){
@@ -524,16 +526,6 @@ void addToDocument(long ind1, long numRow){
 }
 void removeToDocument(long startIndex, long howMany){
 
-    if(startIndex > nodeInDocument){    // se provo ad eliminare un nodo che non esiste
-        tail_history->copy = false;
-        return;
-    }
-
-                    // (howMany-1) perchè startIndex è compreso in howMany
-    if(startIndex+(howMany-1) > nodeInDocument){       // se provo ad eliminare più nodi di quanti ce ne sono
-        howMany = (nodeInDocument-startIndex+1);      // calcolo quanti nodi effettivamente posso cancellare
-    }
-
     tail_history->numRow = nodeInDocument;
     tail_history->cellAllocated = document.dim;
     tail_history->rowModified = (array_string_ptr ) calloc(document.dim, sizeof(string_ptr));
@@ -541,6 +533,16 @@ void removeToDocument(long startIndex, long howMany){
     memcpy(tail_history->rowModified, document.containers, document.dim*sizeof(string_ptr));
 
     tail_history->copy = true;
+
+    if(startIndex > nodeInDocument){    // se provo ad eliminare un nodo che non esiste
+        return;
+    }
+
+    // (howMany-1) perchè startIndex è compreso in howMany
+    if(startIndex+(howMany-1) > nodeInDocument){       // se provo ad eliminare più nodi di quanti ce ne sono
+        howMany = (nodeInDocument-startIndex+1);      // calcolo quanti nodi effettivamente posso cancellare
+    }
+
 
 
     for (int i = 0; i < nodeInDocument-howMany; ++i) {  // traslo tutto in giù di howMany
@@ -652,14 +654,14 @@ void undoChange(){
 }
 void undoDelete() {
 
-    if(tail_history->copy == false){
+    //if(tail_history->copy){
 
         document.containers = tail_history->rowModified;    // ripristino la versione precendente alla delete
 
         document.dim = tail_history->cellAllocated;
         nodeInDocument = tail_history->numRow;
 
-    }
+    //}
 }
 
 void redoChange(){
@@ -675,13 +677,16 @@ void redoChange(){
         long startIndex = tail_history->ind1;
         long numRow = tail_history->numRow;
 
-        if(startIndex+(numRow-1) > document.dim-1){     // se voglio scrivere in un nodo che non è ancora stato allocato
+        /*if(startIndex+(numRow-1) > document.dim-1){     // se voglio scrivere in un nodo che non è ancora stato allocato
             allocMem(&document, numRow);
-        }
+        }*/
 
         for (int i = 0; i < numRow; ++i) {
 
-            document.containers[startIndex+i] = tail_history->rowModified[i];
+            if (startIndex+i < document.dim) {
+                document.containers[startIndex+i] = tail_history->rowModified[i];
+            }
+            //document.containers[startIndex+i] = tail_history->rowModified[i];
 
         }
 
@@ -693,14 +698,14 @@ void redoChange(){
 }
 void redoDelete(){
 
-    if(tail_history->copy == false){
+    //if(tail_history->copy){
 
         document.containers = tail_history->next->rowModified;    // ripristino la versione successiva alla delete
 
         document.dim = tail_history->next->cellAllocated;
         nodeInDocument = tail_history->next->numRow;
 
-    }
+    //}
 
 }
 
