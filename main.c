@@ -91,7 +91,7 @@ void getBounds(string_ptr line, long *ind1, long *ind2);
 int main() {
 
     document.dim = 0;
-    allocMem(&document);
+    allocMem(&document, 1);
 
 
     // init 0 state
@@ -488,12 +488,12 @@ void addToDocument(long ind1, long numRow){
 
         if(ind1+(numRow-1) > document.dim-1){     // se voglio scrivere in un nodo che non è ancora stato allocato
             allocMem(&document, numRow);
-
-            tail_history->numRow = numRow;
-            tail_history->cellAllocated = document.dim;
-            tail_history->rowModified = (array_string_ptr ) calloc(document.dim, sizeof(string_ptr));    // ind1 è incluso in numRow
-            tail_history->copy = false;
         }
+
+        tail_history->numRow = numRow;
+        tail_history->cellAllocated = document.dim;
+        tail_history->rowModified = (array_string_ptr ) calloc(document.dim, sizeof(string_ptr));    // ind1 è incluso in numRow
+        tail_history->copy = false;
 
     }
 
@@ -510,7 +510,6 @@ void addToDocument(long ind1, long numRow){
             if(modify == false){    // se sono solo nodi nuovi allora li salvo nella history per poterli poi ripristinare
 
                 tail_history->rowModified[i] = row;
-                tail_history->numRow = numRow;
             }
 
         }
@@ -595,7 +594,7 @@ void redoToDocument(long ret){
 
                 document.containers = pendingState->rowModified;
                 nodeInDocument = pendingState->numRow;
-                document.dim = tail_history->cellAllocated;
+                document.dim = pendingState->cellAllocated;
 
                 continue;   // skippo perchè non devo gestirlo
 
