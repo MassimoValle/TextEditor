@@ -4,7 +4,7 @@
 #include <stdbool.h>
 
 #define ROW_LEN 1024
-#define ALLOC_INCREMENT 1
+#define ALLOC_INCREMENT 50
 
 
 typedef struct HistoryNode* history_pointer;
@@ -647,9 +647,9 @@ void undoChange(){
         long startIndex = tail_history->ind1;
         long numRow = tail_history->numRow;
 
-        if(startIndex+(numRow-1) > document.dim-1){     // se voglio scrivere in un nodo che non è ancora stato allocato
+        /*if(startIndex+(numRow-1) > document.dim-1){     // se voglio scrivere in un nodo che non è ancora stato allocato
             allocMem(&document, numRow);
-        }
+        }*/
 
         for (int i = 0; i < numRow; ++i) {
 
@@ -700,7 +700,7 @@ void redoChange(){
 
     } else{     // se avevo aggiunto dei nodi li ripristino prendendoli dalla rowModified
 
-        long startIndex = tail_history->ind1;
+        /*long startIndex = tail_history->ind1;
         long numRow = tail_history->numRow;
 
         for (int i = 0; i < numRow; ++i) {
@@ -709,7 +709,34 @@ void redoChange(){
 
         }
 
-        nodeInDocument += tail_history->numRow;
+        nodeInDocument += tail_history->numRow;*/
+
+        history_pointer curr = tail_history->next;
+        while (!curr->copy) {
+            curr = curr->next;
+        }
+
+        document.containers = tail_history->next->prevState;
+        document.dim = tail_history->next->cellAllocated;
+        nodeInDocument = tail_history->next->numRow;
+
+        long startIndex = tail_history->ind1;
+        long numRow = tail_history->numRow;
+
+        long iterator = startIndex+numRow;
+        string_ptr ptr = document.containers[iterator];
+
+        while (ptr != NULL){
+            ptr = NULL;
+            iterator++;
+            ptr = document.containers[iterator];
+        }
+
+        for (int i = 0; i < numRow; ++i) {
+
+            document.containers[startIndex+i] = tail_history->prevState[i];
+
+        }
 
     }
 
