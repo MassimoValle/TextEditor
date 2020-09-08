@@ -608,11 +608,20 @@ void redoToDocument(long ret){
 
             if(tail_history->next == NULL){   // se lo stato successivo è pendingState (ho rifatto tante redo quante undo fatte prima)
 
-                document.containers = pendingState->prevState;
-                nodeInDocument = pendingState->numRow;
-                document.dim = pendingState->cellAllocated;
+                if(tail_history->value[3] == 'c' && tail_history->copy == false){
 
-                continue;   // skippo perchè non devo gestirlo
+                    redoChange();
+
+                } else{
+
+                    document.containers = pendingState->prevState;
+                    nodeInDocument = pendingState->numRow;
+                    document.dim = pendingState->cellAllocated;
+
+                    continue;   // skippo perchè non devo gestirlo
+
+                }
+
 
             }
 
@@ -712,24 +721,27 @@ void redoChange(){
         nodeInDocument += tail_history->numRow;*/
 
         history_pointer curr = tail_history->next;
+
+        if(curr == NULL) curr = pendingState;
+
         while (!curr->copy) {
             curr = curr->next;
+            if(curr == NULL) curr = pendingState;
         }
 
-        document.containers = tail_history->next->prevState;
-        document.dim = tail_history->next->cellAllocated;
-        nodeInDocument = tail_history->next->numRow;
+        document.containers = curr->prevState;
+        document.dim = curr->cellAllocated;
+        nodeInDocument = curr->numRow;
 
         long startIndex = tail_history->ind1;
         long numRow = tail_history->numRow;
 
         long iterator = startIndex+numRow;
-        string_ptr ptr = document.containers[iterator];
+        //string_ptr ptr = document.containers[iterator];
 
-        while (ptr != NULL){
-            ptr = NULL;
+        while (document.containers[iterator] != NULL){
+            document.containers[iterator] = NULL;
             iterator++;
-            ptr = document.containers[iterator];
         }
 
         for (int i = 0; i < numRow; ++i) {
