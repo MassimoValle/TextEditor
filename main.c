@@ -632,7 +632,13 @@ void undoChange(){
     } else{     // se avevo aggiunto solo dei nodi allora li metto semplicemente a null
 
         long startIndex = tail_history->ind1;
-        for (int i = 0; i < tail_history->numRow; ++i) {
+        long numRow = tail_history->numRow;
+
+        if(startIndex+(numRow-1) > document.dim-1){     // se voglio scrivere in un nodo che non è ancora stato allocato
+            allocMem(&document, numRow);
+        }
+
+        for (int i = 0; i < numRow; ++i) {
 
             document.containers[startIndex+i] = NULL;
 
@@ -679,7 +685,7 @@ void redoChange(){
 
         }
 
-        document.dim = tail_history->cellAllocated;
+        //document.dim = tail_history->cellAllocated;
         nodeInDocument += tail_history->numRow;
 
     }
@@ -691,7 +697,7 @@ void redoDelete(){
 
         document.containers = tail_history->next->rowModified;    // ripristino la versione successiva alla delete
 
-        document.dim = tail_history->cellAllocated;
+        document.dim = tail_history->next->cellAllocated;
         nodeInDocument = tail_history->next->numRow;
 
     }
