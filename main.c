@@ -4,7 +4,7 @@
 #include <stdbool.h>
 
 #define ROW_LEN 1024
-#define ALLOC_INCREMENT 50
+#define ALLOC_INCREMENT 1
 
 
 typedef struct HistoryNode* history_pointer;
@@ -17,9 +17,13 @@ struct HistoryNode {
     long ind1;
     long ind2;
 
-    array_string_ptr rowModified;   // array salvato in caso di modifica di una o più stringhe, o righe aggiunte
+    array_string_ptr newValues;     // usato nel caso di una copia per salvarmi i nuovi valori che do alla riga
+    long numNewValues;              // numero di righe a cui ho cambiato valore
+
+    array_string_ptr prevState;   // array salvato in caso di modifica di una o più stringhe, o righe aggiunte
     long cellAllocated;       // spazio di memoria allocato
     long numRow;    // numero di righe se cui ha avuto effetto la modifica (se è una copia sono nodeInDocument)
+
     bool copy;      // true se ho salvato una copia dell'array (caso in cui ho modificato almeno un nodo)
 
     history_pointer next;
@@ -100,9 +104,9 @@ int main() {
     tail_history->value = (string_ptr)"0,0c";
     tail_history->numRow = nodeInDocument;
     tail_history->cellAllocated = document.dim;
-    tail_history->rowModified = (array_string_ptr ) calloc(document.dim, sizeof(string_ptr));
+    tail_history->prevState = (array_string_ptr ) calloc(document.dim, sizeof(string_ptr));
 
-    tail_history->rowModified = document.containers;
+    tail_history->prevState = document.containers;
     tail_history->copy = true;
 
 
@@ -421,7 +425,9 @@ history_pointer createHistoryNode(string_ptr x, long ind1, long ind2) {
     newNode->ind2 = ind2;
     newNode->numRow = 0;
     newNode->cellAllocated = 0;
-    newNode->rowModified = NULL;
+    newNode->newValues = NULL;
+    newNode->numNewValues = 0;
+    newNode->prevState = NULL;
     newNode->copy = false;
     newNode->prev = NULL;
     newNode->next = NULL;
@@ -436,14 +442,11 @@ void initPendingState(){    // salva l'ultimo stato raggiunto dal programma
     // assegno memoria a rowModified
     pendingState->numRow = nodeInDocument;
     pendingState->cellAllocated = document.dim;
-    pendingState->rowModified = (array_string_ptr ) calloc(document.dim, sizeof(string_ptr));
+    pendingState->prevState = (array_string_ptr ) calloc(document.dim, sizeof(string_ptr));
 
     // copio lo stato attuale
-    if(document.containers == NULL){
-        pendingState->rowModified = NULL;
-    } else{
-        memcpy(pendingState->rowModified, document.containers, document.dim * sizeof(string_ptr));
-    }
+
+    memcpy(pendingState->prevState, document.containers, document.dim * sizeof(string_ptr));
 
     pendingState->copy = true;
 
@@ -480,22 +483,26 @@ void addToDocument(long ind1, long numRow){
 
             tail_history->numRow = nodeInDocument;
             tail_history->cellAllocated = document.dim;
-            tail_history->rowModified = (array_string_ptr ) calloc(document.dim, sizeof(string_ptr));
+            tail_history->numNewValues = numRow;
+            tail_history->newValues = (array_string_ptr ) calloc(numRow, sizeof(string_ptr));
+            tail_history->prevState = (array_string_ptr ) calloc(document.dim, sizeof(string_ptr));
 
-            memcpy(tail_history->rowModified, document.containers, document.dim * sizeof(string_ptr));
+            memcpy(tail_history->prevState, document.containers, document.dim * sizeof(string_ptr));
 
             tail_history->copy = true;
             modify = true;
 
-    } else{
+    }
 
-        if(ind1+(numRow-1) > document.dim-1){     // se voglio scrivere in un nodo che non è ancora stato allocato
-            allocMem(&document, numRow);
-        }
+    if(ind1+(numRow-1) > document.dim-1){     // se voglio scrivere in un nodo che non è ancora stato allocato
+        allocMem(&document, numRow);
+    }
+
+    if(modify == false){
 
         tail_history->numRow = numRow;
         tail_history->cellAllocated = numRow;
-        tail_history->rowModified = (array_string_ptr ) calloc(numRow, sizeof(string_ptr));    // ind1 è incluso in numRow
+        tail_history->prevState = (array_string_ptr ) calloc(numRow, sizeof(string_ptr));    // ind1 è incluso in numRow
         tail_history->copy = false;
 
     }
@@ -513,11 +520,15 @@ void addToDocument(long ind1, long numRow){
 
             if(modify == false){    // se sono solo nodi nuovi allora li salvo nella history per poterli poi ripristinare
             // usato quando faccio una change che modifica e aggiunge nuovi nodi
-                tail_history->rowModified[i] = row;
+                tail_history->prevState[i] = row;
             }
 
         }
 
+
+        if(modify){
+            tail_history->newValues[i] = row;
+        }
 
         document.containers[key] = row;     // assegno row all'indice di document
 
@@ -528,9 +539,9 @@ void removeToDocument(long startIndex, long howMany){
 
     tail_history->numRow = nodeInDocument;
     tail_history->cellAllocated = document.dim;
-    tail_history->rowModified = (array_string_ptr ) calloc(document.dim, sizeof(string_ptr));
+    tail_history->prevState = (array_string_ptr ) calloc(document.dim, sizeof(string_ptr));
 
-    memcpy(tail_history->rowModified, document.containers, document.dim*sizeof(string_ptr));
+    memcpy(tail_history->prevState, document.containers, document.dim * sizeof(string_ptr));
 
     tail_history->copy = true;
 
@@ -597,7 +608,7 @@ void redoToDocument(long ret){
 
             if(tail_history->next == NULL){   // se lo stato successivo è pendingState (ho rifatto tante redo quante undo fatte prima)
 
-                document.containers = pendingState->rowModified;
+                document.containers = pendingState->prevState;
                 nodeInDocument = pendingState->numRow;
                 document.dim = pendingState->cellAllocated;
 
@@ -627,7 +638,7 @@ void undoChange(){
 
     if(tail_history->copy){     // se avevo modificato dei nodi
 
-        document.containers = tail_history->rowModified; // ripristino la modifica prima della modifica dei nodi
+        document.containers = tail_history->prevState; // ripristino la modifica prima della modifica dei nodi
         document.dim = tail_history->cellAllocated;
         nodeInDocument = tail_history->numRow;
 
@@ -656,7 +667,7 @@ void undoDelete() {
 
     //if(tail_history->copy){
 
-        document.containers = tail_history->rowModified;    // ripristino la versione precendente alla delete
+        document.containers = tail_history->prevState;    // ripristino la versione precendente alla delete
 
         document.dim = tail_history->cellAllocated;
         nodeInDocument = tail_history->numRow;
@@ -664,33 +675,40 @@ void undoDelete() {
     //}
 }
 
+
 void redoChange(){
 
     if(tail_history->copy) {    // se avevo modificato dei nodi devo andare allo stato successivo
 
-        document.containers = tail_history->next->rowModified;
-        document.dim = tail_history->next->cellAllocated;
-        nodeInDocument = tail_history->next->numRow;
+        if(tail_history->next->copy){   // se lo stato successivo è una copia allora la applico
+
+            document.containers = tail_history->next->prevState;
+            document.dim = tail_history->next->cellAllocated;
+            nodeInDocument = tail_history->next->numRow;
+
+        } else{    // altrimenti nel caso l'ilstruzione successiva aggiunge solo nodi non posso far puntare rowModified
+                    // devo rieffettuare la modifica assegnando di nuovo i valori modificati
+            long startIndex = tail_history->ind1;
+            long numRow = tail_history->numNewValues;
+
+            for (int i = 0; i < numRow; ++i) {
+
+                document.containers[startIndex+i] = tail_history->newValues[i];
+            }
+
+        }
 
     } else{     // se avevo aggiunto dei nodi li ripristino prendendoli dalla rowModified
 
         long startIndex = tail_history->ind1;
         long numRow = tail_history->numRow;
 
-        /*if(startIndex+(numRow-1) > document.dim-1){     // se voglio scrivere in un nodo che non è ancora stato allocato
-            allocMem(&document, numRow);
-        }*/
-
         for (int i = 0; i < numRow; ++i) {
 
-            if (startIndex+i < document.dim) {
-                document.containers[startIndex+i] = tail_history->rowModified[i];
-            }
-            //document.containers[startIndex+i] = tail_history->rowModified[i];
+            document.containers[startIndex+i] = tail_history->prevState[i];
 
         }
 
-        //document.dim = tail_history->cellAllocated;
         nodeInDocument += tail_history->numRow;
 
     }
@@ -698,14 +716,24 @@ void redoChange(){
 }
 void redoDelete(){
 
-    //if(tail_history->copy){
+    if(tail_history->next->copy){
 
-        document.containers = tail_history->next->rowModified;    // ripristino la versione successiva alla delete
+        document.containers = tail_history->next->prevState;    // ripristino la versione successiva alla delete
 
         document.dim = tail_history->next->cellAllocated;
         nodeInDocument = tail_history->next->numRow;
 
-    //}
+    } else{     // nel caso l'ilstruzione successiva aggiunge solo nodi non posso far puntare rowModified
+
+        long numRow = tail_history->numRow;
+        long startIndex = tail_history->ind1;
+
+        for (int i = 0; i < numRow; ++i) {
+
+            document.containers[startIndex+i] = NULL;
+
+        }
+    }
 
 }
 
