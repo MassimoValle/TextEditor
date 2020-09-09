@@ -63,15 +63,15 @@ bool doRedo = 0;
 int undoOrRedoDone = 0;
 //#########################################################//
 
-bool savePendingState = true;
+//bool savePendingState = true;
 string_ptr pendingCommand = NULL;
-history_pointer pendingState = NULL;
+//history_pointer pendingState = NULL;
 
 
 // CREATE NODES
 void allocMem(struct DynamicArray* array, long cellNeeded);
 history_pointer createHistoryNode(string_ptr x, long ind1, long ind2);
-void initPendingState();
+//void initPendingState();
 
 // DB MANAGING
 void addInHistory(long ind1, long ind2, bool zero);
@@ -81,7 +81,7 @@ void removeToDocument(long startIndex, long howMany);
 void undoToDocument(long ret);
 void redoToDocument(long ret);
 
-void restoreNextSavedState();
+void restorePrevSavedState();
 
 //void undoChange();
 //void undoDelete();
@@ -127,7 +127,7 @@ int main() {
             if(undo > 0 || redo > 0 || possiblyRedo > 0){       // mi serve per la undo/redo
 
                 pendingCommand = row;
-                savePendingState = true;
+                //savePendingState = true;
                 doUndo = true;
                 doRedo = true;
                 exit = true;
@@ -159,7 +159,7 @@ int main() {
             if(undo > 0 || redo > 0 || possiblyRedo > 0){       // mi serve per la undo/redo
 
                 pendingCommand = row;
-                savePendingState = true;
+                //savePendingState = true;
                 doUndo = true;
                 doRedo = true;
                 exit = true;
@@ -182,7 +182,7 @@ int main() {
 
             if(undo > 0 || redo > 0){       // mi serve per la undo/redo
 
-                if(pendingCommand == NULL) savePendingState = true;
+                //if(pendingCommand == NULL) savePendingState = true;
 
                 pendingCommand = row;
                 doUndo = true;
@@ -344,7 +344,7 @@ int main() {
                     if(strstr(pendingCommand, "p") == NULL){    // se il comando non è una print
                         possiblyRedo = 0;
                         pendingCommand = NULL;
-                        pendingState = NULL;
+                        //pendingState = NULL;
                     }
 
                     undo = 0;
@@ -367,7 +367,7 @@ int main() {
                 if(strstr(pendingCommand, "p") == NULL){    // se il comando non è una print (non contiene la lettera p)
                     possiblyRedo = 0;
                     pendingCommand = NULL;
-                    pendingState = NULL;
+                    //pendingState = NULL;
                 }
 
                 undo = 0;
@@ -437,7 +437,7 @@ history_pointer createHistoryNode(string_ptr x, long ind1, long ind2) {
 
     return newNode;
 }
-void initPendingState(){    // salva l'ultimo stato raggiunto dal programma
+/*void initPendingState(){    // salva l'ultimo stato raggiunto dal programma
 
     // creo lastState
     pendingState = createHistoryNode(tail_history->value, tail_history->ind1, tail_history->ind2);
@@ -457,7 +457,7 @@ void initPendingState(){    // salva l'ultimo stato raggiunto dal programma
 
     pendingState->copy = true;
 
-}
+}*/
 
 
 // DB MANAGING
@@ -642,10 +642,10 @@ void removeToDocument(long startIndex, long howMany){
 
 void undoToDocument(long ret){
 
-    if(savePendingState == true){       // salvo lo stato in tutti i casi tranne quando faccio undo tramite il comandi print
+    /*if(savePendingState == true){       // salvo lo stato in tutti i casi tranne quando faccio undo tramite il comandi print
         initPendingState();             // e poi faccio ancora delle undo tramite un'altro comando di print
         savePendingState = false;
-    }
+    }*/
 
     bool stop = false;
     for (int i = 0; i < ret && !stop; ++i) {         // svolgo le undo
@@ -664,9 +664,13 @@ void undoToDocument(long ret){
         // in questo punto della hitstory è salvata una copia intera del document
         // quindi posso ripristinare subito lo stato
 
-        document.containers = tail_history->prevState;    // ripristino la versione precendente alla delete
+        //document.containers = tail_history->prevState;    // ripristino la versione precendente alla delete
         document.dim = tail_history->cellAllocated;
         nodeInDocument = tail_history->numRow;
+
+        document.containers = (array_string_ptr ) calloc(tail_history->cellAllocated, sizeof(string_ptr));
+        memcpy(document.containers, tail_history->prevState, tail_history->cellAllocated * sizeof(string_ptr));
+
     }
     else
     {
@@ -676,7 +680,7 @@ void undoToDocument(long ret){
         // TODO: CONTROLLA perché non ci credo che funziona così semplicemente, dai fratm è assurdo
         //nodeInDocument -= tail_history->numRow;
 
-        restoreNextSavedState();
+        restorePrevSavedState();
     }
 
 }
@@ -699,28 +703,33 @@ void redoToDocument(long ret){
         // in questo punto della hitstory è salvata una copia intera del document
         // quindi posso ripristinare subito lo stato
 
-        document.containers = tail_history->prevState;    // ripristino la versione precendente alla delete
+        //document.containers = tail_history->prevState;    // ripristino la versione precendente alla delete
         document.dim = tail_history->cellAllocated;
         nodeInDocument = tail_history->numRow;
+
+        document.containers = (array_string_ptr ) calloc(tail_history->cellAllocated, sizeof(string_ptr));
+        memcpy(document.containers, tail_history->prevState, tail_history->cellAllocated * sizeof(string_ptr));
+
     }
     else
     {
         // in questo punto della history non è stata salvata una copia ma solo le righe aggiunte
         // devo cercare lo stato successivo in cui è stata fatta una copia completa e ritornare allo stato richiesto
 
-        restoreNextSavedState();
+        restorePrevSavedState();
     }
 
 }
 
-void restoreNextSavedState() {
-    int exceedingRows = 0;
+void restorePrevSavedState() {
+    //printf("cane\n");
+    /*int exceedingRows = 0;
 
     history_pointer iterator = tail_history->next;
 
     // il pendingState serve se l'ultimo comando (o una serie di ultimi comandi) sono change che aggiungono
     // perché in questo caso non ci sarebbe uno stato completo dopo le change che aggiungo => crasha tutto eheh
-    if (iterator == NULL) iterator = pendingState;
+    //if (iterator == NULL) iterator = pendingState;
 
     while (!iterator->copy) {
         // se copy è false vuol dire che questo è un comando che aggiunge solo righe, salvo quante ne ha aggiunte
@@ -728,7 +737,7 @@ void restoreNextSavedState() {
 
         iterator = iterator->next;
 
-        if (iterator == NULL) iterator = pendingState;
+        //if (iterator == NULL) iterator = pendingState;
     }
 
 
@@ -738,7 +747,57 @@ void restoreNextSavedState() {
 
     // se sono state effetuate più change che aggiungono
     // tolgo da nodeInDocument il numero di righe che sono state aggiunte nelle change successive alla prossima
-    nodeInDocument -= exceedingRows;
+    nodeInDocument -= exceedingRows;*/
+
+
+    // torna indietro fino ad uno stato completo
+    history_pointer iterator = tail_history->prev;
+    //long rowCount = tail_history->numRow;
+
+    while (!iterator->copy) {
+        //rowCount += iterator->numRow;
+        iterator = iterator->prev;
+    }
+
+    /*document.dim = iterator->cellAllocated;
+    nodeInDocument = iterator->numRow;
+
+    if(nodeInDocument+rowCount > document.dim){
+
+    }*/
+
+    // copia lo stato completo
+    document.containers = (array_string_ptr ) calloc(iterator->cellAllocated, sizeof(string_ptr));
+    memcpy(document.containers, iterator->prevState, iterator->cellAllocated * sizeof(string_ptr));
+
+    document.dim = iterator->cellAllocated;
+    nodeInDocument = iterator->numRow;
+
+
+
+    // applica le modifiche successive fino allo stato corrente richiesto
+    iterator = iterator->next;
+
+    while (iterator != tail_history->next) {
+
+        long startIndex = iterator->ind1;
+        long numRow = iterator->numRow;
+
+        if(startIndex+(numRow-1) > document.dim-1){     // se voglio scrivere in un nodo che non è ancora stato allocato
+            allocMem(&document, numRow);
+        }
+
+        for (int i = 0; i < numRow; ++i) {
+
+            document.containers[startIndex+i] = iterator->prevState[i];
+        }
+
+        nodeInDocument += numRow;
+
+        iterator = iterator->next;
+    }
+
+
 }
 
 /*void undoToDocument(long ret){
