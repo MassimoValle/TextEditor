@@ -4,7 +4,7 @@
 #include <stdbool.h>
 
 #define ROW_LEN 1024
-#define ALLOC_INCREMENT 50
+#define ALLOC_INCREMENT 1
 
 
 typedef struct HistoryNode* history_pointer;
@@ -83,7 +83,7 @@ void redoToDocument(long ret);
 
 void undoChange();
 void undoDelete();
-void redoChange();
+void redoChange(bool increment);
 void redoDelete();
 
 // HELPER
@@ -208,16 +208,18 @@ int main() {
 
                 for (int i = 0; i < numRow; i++) {
 
+                    //printf("try\n");
+
                     if(ind1+i > nodeInDocument){
                         printf(".\n");
                     } else{
 
-
                         string_ptr string = document.containers[ind1+i];
+                        printf("%s\n", string);
 
-                        if(string == NULL || strcmp(string, "") == 0){
+                        /*if(string == NULL || strcmp(string, "") == 0){
                             printf(".\n");
-                        } else printf("%s\n", string);
+                        } else printf("%s\n", string);*/
                     }
 
 
@@ -513,8 +515,8 @@ void addToDocument(long ind1, long numRow){
 
 
         getRow();
-
-        if (document.containers[key] == NULL) { // se è un nodo nuovo...
+        if (key > nodeInDocument) {
+        //if (document.containers[key] == NULL) { // se è un nodo nuovo...
             nodeInDocument++;
 
 
@@ -610,7 +612,7 @@ void redoToDocument(long ret){
 
                 if(tail_history->value[3] == 'c' && tail_history->copy == false){
 
-                    redoChange();
+                    redoChange(false);
 
                 } else{
 
@@ -630,7 +632,7 @@ void redoToDocument(long ret){
 
         if(tail_history->value[3] == 'c'){
 
-            redoChange();
+            redoChange(true);
 
         } else{
 
@@ -685,7 +687,7 @@ void undoDelete() {
 }
 
 
-void redoChange(){
+void redoChange(bool increment){
 
     if(tail_history->copy) {    // se avevo modificato dei nodi devo andare allo stato successivo
 
@@ -729,9 +731,10 @@ void redoChange(){
             if(curr == NULL) curr = pendingState;
         }
 
-        document.containers = curr->prevState;
+        memcpy(document.containers, curr->prevState, curr->cellAllocated);
+        //document.containers = curr->prevState;
         document.dim = curr->cellAllocated;
-        nodeInDocument = curr->numRow;
+        //nodeInDocument = curr->numRow;
 
         long startIndex = tail_history->ind1;
         long numRow = tail_history->numRow;
@@ -746,9 +749,20 @@ void redoChange(){
 
         for (int i = 0; i < numRow; ++i) {
 
-            document.containers[startIndex+i] = tail_history->prevState[i];
+            string_ptr string = document.containers[startIndex+i];
+            string_ptr string1 = tail_history->prevState[i];
+            strncpy(string, string1, strlen(string1));
+            //strcpy(string, string1);
+            document.containers[startIndex+i] = string;
+            //strcpy(document.containers[startIndex+i], tail_history->prevState[i]);
+            //document.containers[startIndex+i] = tail_history->prevState[i];
 
         }
+
+        if(increment){
+            nodeInDocument += tail_history->numRow;
+        }
+
 
     }
 
@@ -763,7 +777,8 @@ void redoDelete(){
         nodeInDocument = tail_history->next->numRow;
 
     } else{     // nel caso l'ilstruzione successiva aggiunge solo nodi non posso far puntare rowModified
-
+                // mi tocca effettivamente fare la cancellazione
+        /*
         long numRow = tail_history->numRow;
         long startIndex = tail_history->ind1;
 
@@ -772,6 +787,33 @@ void redoDelete(){
             document.containers[startIndex+i] = NULL;
 
         }
+         */
+
+        //memcpy(document.containers, document.containers, document.dim);
+
+        long ind1 = tail_history->ind1;
+        long ind2 = tail_history->ind2;
+        long howMany = ind2-ind1+1;
+        long startIndex = tail_history->ind1;
+
+
+        if(startIndex+(howMany-1) > nodeInDocument){       // se provo ad eliminare più nodi di quanti ce ne sono
+            howMany = (nodeInDocument-startIndex+1);      // calcolo quanti nodi effettivamente posso cancellare
+        }
+
+
+        for (int i = 0; i < nodeInDocument-howMany; ++i) {  // traslo tutto in giù di howMany
+
+            document.containers[startIndex+i] = document.containers[startIndex+howMany+i];
+
+        }
+
+        for (int i = 0; i < howMany; ++i) {     // metto a null gli ultimi howMany nodi in fondo
+
+            document.containers[nodeInDocument-i] = NULL;
+        }
+
+        nodeInDocument -= howMany;
     }
 
 }
