@@ -17,7 +17,7 @@ struct HistoryNode {
     long ind1;
     long ind2;
 
-    array_string_ptr prevState;   // array salvato in caso di modifica di una o più stringhe, o righe aggiunte
+    array_string_ptr savedState;   // array salvato in caso di modifica di una o più stringhe, o righe aggiunte
     long cellAllocated;       // spazio di memoria allocato
     long numRow;    // numero di righe se cui ha avuto effetto la modifica (se è una copia sono nodeInDocument)
 
@@ -60,7 +60,9 @@ bool doRedo = 0;
 int undoOrRedoDone = 0;
 //#########################################################//
 
-string_ptr pendingCommand = NULL;
+
+string_ptr pendingCommand = NULL;   // poichè le undo/redo aspettano un comando c, d o p per essere eseguite,
+                                    // quando le eseguo mi serve salvare temporaneamente il comando che le ha triggerate
 
 
 // CREATE NODES
@@ -69,6 +71,7 @@ history_pointer createHistoryNode(string_ptr x, long ind1, long ind2);
 
 // DB MANAGING
 void addInHistory(long ind1, long ind2, bool zero);
+
 void addToDocument(long ind1, long numRow);
 void removeToDocument(long startIndex, long howMany);
 
@@ -85,24 +88,28 @@ void getBounds(string_ptr line, long *ind1, long *ind2);
 
 int main() {
 
+    // SALVO LO STATO IN CASO DI CHANGE CHE MODIFICA ALMENO UN NODO O DI DELETE, SEMPRE DOPO AVER FATTO LA MODIFICA
+    // NEL CASO DI CHANGE CHE AGGIUNGE SOLO NODI INVECE MI SALVO LE RIGHE AGGIUNTE
+
     document.dim = 0;
     allocMem(&document, 1);
 
 
     // init 0 state
-    addInHistory(0, 0, true);
+    addInHistory(0, 0, true);       // nodo inziale della history, corrisponde al documento vuoto iniziale
 
     tail_history->value = (string_ptr)"0,0c";
     tail_history->numRow = nodeInDocument;
     tail_history->cellAllocated = document.dim;
-    tail_history->prevState = (array_string_ptr ) calloc(document.dim, sizeof(string_ptr));
+    tail_history->savedState = (array_string_ptr ) calloc(document.dim, sizeof(string_ptr));
 
     tail_history->copy = true;
 
 
     // start program
 
-    bool exit = false;
+    bool exit = false;      // indica se devo eseguire veramente il comando o se prima devo fare le undo/redo
+                            // exit == true ==> svolgi prima le undo/redo
 
     row = getRow();
     unsigned long len = strlen(row);
@@ -189,8 +196,9 @@ int main() {
                     len = strlen(row);
                     continue;
                 }
-                long numRow = ind2 - ind1 + 1;
 
+
+                long numRow = ind2 - ind1 + 1;
 
                 for (int i = 0; i < numRow; i++) {
 
@@ -200,6 +208,8 @@ int main() {
 
                         string_ptr string = document.containers[ind1+i];
 
+
+                        // teoricamente dovrebbe entrare sempre nell'else perchè il numero di elementi validi è gestito da nodeInDocument
                         if(string == NULL || strcmp(string, "") == 0){
                             printf(".\n");
                         } else printf("%s\n", string);
@@ -218,13 +228,13 @@ int main() {
 
             free(row);      // non mi serve salvarmi il comando di undo
 
-            if(doUndo == true){
+            if(doUndo == true){     // allora eseguo le undo
 
                 undoToDocument(ret);
                 possiblyUndo -= ret;
                 undoOrRedoDone = 1;
 
-            } else{
+            } else{     // altrimenti le colleziono
 
                 undo += ret;
 
@@ -244,7 +254,7 @@ int main() {
 
                 free(row);      // non mi serve salvarmi il comando di redo
 
-                if(doRedo == true){
+                if(doRedo == true){    // allora eseguo le redo
 
                     redoToDocument(ret);
                     undoOrRedoDone = 1;
@@ -252,7 +262,7 @@ int main() {
                     possiblyUndo += ret;
                     possiblyRedo -= ret;
 
-                } else{
+                } else{         // altrimenti le colleziono
 
                     redo += ret;
 
@@ -279,7 +289,7 @@ int main() {
 
             if(undoOrRedoDone == 0){
 
-                if(redo > 0) {
+                if(redo > 0) {          // solo nel caso in cui sono state fatte delle redo
                     redo -= undo;
                     undo = 0;
                 }
@@ -298,10 +308,10 @@ int main() {
                     undoSet = undo - redo;
                 }
 
-                if(undoSet > 0){
+                if(undoSet > 0){            // ho fatto più undo che redo
                     row = NULL;
                     row = (string_ptr)calloc(21, sizeof(char));
-                    snprintf(row, 20, "%ldu", undoSet);
+                    snprintf(row, 20, "%ldu", undoSet);     // creo il comando di undo
                     len = strlen(row);
 
                     if(redo < 0){
@@ -311,20 +321,20 @@ int main() {
                     }
 
                 }
-                else if(undoSet < 0){
+                else if(undoSet < 0){       // allora ci sono più redo che undo
 
                     row = NULL;
                     row = (string_ptr)calloc(22, sizeof(char));
-                    snprintf(row, 21, "%ldr", -(undoSet));
+                    snprintf(row, 21, "%ldr", -(undoSet));      // creo il comando di redo
                     len = strlen(row);
 
-                } else if( undoSet == 0){
+                } else if( undoSet == 0){   // se si bilanciano (#undo == #redo)
 
                     row = NULL;
                     row = pendingCommand;
                     len = strlen(row);
 
-                    if(strstr(pendingCommand, "p") == NULL){    // se il comando non è una print
+                    if(strstr(pendingCommand, "p") == NULL){    // se il comando non è una print (non contiene la lettera p)
                         possiblyRedo = 0;
                         pendingCommand = NULL;
                     }
@@ -340,7 +350,7 @@ int main() {
 
                 }
             }
-            else{
+            else{   // qui ci entra dopo aver effettuato la undo/redo e prima di eseguire il pending state
 
                 row = NULL;
                 row = pendingCommand;
@@ -362,7 +372,7 @@ int main() {
             }
 
         }
-        else{
+        else{   // caso base in cui non devo effettuare nessuna undo/redo
 
             getRow();
             len = strlen(row);
@@ -384,7 +394,7 @@ void allocMem(struct DynamicArray* array, long cellNeeded){  // alloco nuova mem
 
     long increment = 0;
 
-    while (increment < cellNeeded){
+    while (increment < cellNeeded){     // incremento di ALLOC_INCREMENT alla volta fino a che non supero le quantità richiesta
         increment += ALLOC_INCREMENT;
     }
 
@@ -401,7 +411,7 @@ history_pointer createHistoryNode(string_ptr x, long ind1, long ind2) {
     newNode->ind2 = ind2;
     newNode->numRow = 0;
     newNode->cellAllocated = 0;
-    newNode->prevState = NULL;
+    newNode->savedState = NULL;
     newNode->copy = false;
 
     newNode->prev = NULL;
@@ -427,7 +437,8 @@ void addInHistory(long ind1, long ind2, bool zero) {
         tail_history = newNode;
     }
 
-    if(!zero)
+    if(!zero)   // se è il primo nodo (quello di inizio main) non lo devo contare come possibile undo
+                                // poichè indica solo lo stato iniziale (quindi vuoto) del documento
         possiblyUndo++;
 
 }
@@ -446,12 +457,12 @@ void addToDocument(long ind1, long numRow){
         tail_history->numRow = numRow;
         tail_history->cellAllocated = numRow;
 
-        tail_history->prevState = (array_string_ptr ) calloc(numRow, sizeof(string_ptr));    // ind1 è incluso in numRow
+        tail_history->savedState = (array_string_ptr ) calloc(numRow, sizeof(string_ptr));
 
         tail_history->copy = false;
     }
 
-
+    // ind1 è incluso in numRow, per questo faccio (numRow-1)
     if(ind1+(numRow-1) > document.dim-1){     // se voglio scrivere in un nodo che non è ancora stato allocato
         allocMem(&document, numRow);
     }
@@ -463,13 +474,13 @@ void addToDocument(long ind1, long numRow){
 
         getRow();
 
-        if (key > nodeInDocument) {
-            nodeInDocument++;
+        if (key > nodeInDocument) {     // se creo un nuovo nodo (ci entra sia nelle change che aggiungono solo che
+            nodeInDocument++;           // nelle change che modificano almeno un nodo e ne aggiungono altri
 
 
             if(modify == false){    // se sono solo nodi nuovi allora li salvo nella history per poterli poi ripristinare
-                // usato quando faccio una change che modifica e aggiunge nuovi nodi
-                tail_history->prevState[i] = row;
+
+                tail_history->savedState[i] = row;
             }
 
         }
@@ -483,9 +494,9 @@ void addToDocument(long ind1, long numRow){
         // se la change modifica delle righe allora salva l'intero stato dopo la change
         tail_history->numRow = nodeInDocument;
         tail_history->cellAllocated = document.dim;
-        tail_history->prevState = (array_string_ptr ) calloc(document.dim, sizeof(string_ptr));
+        tail_history->savedState = (array_string_ptr ) calloc(document.dim, sizeof(string_ptr));
 
-        memcpy(tail_history->prevState, document.containers, document.dim * sizeof(string_ptr));
+        memcpy(tail_history->savedState, document.containers, document.dim * sizeof(string_ptr));
 
         tail_history->copy = true;
     }
@@ -494,7 +505,7 @@ void addToDocument(long ind1, long numRow){
 void removeToDocument(long startIndex, long howMany){
 
     if (startIndex <= nodeInDocument) {
-        // (howMany-1) perchè startIndex è compreso in howMany
+                    // (howMany-1) perchè startIndex è compreso in howMany
         if(startIndex+(howMany-1) > nodeInDocument){       // se provo ad eliminare più nodi di quanti ce ne sono
             howMany = (nodeInDocument-startIndex+1);      // calcolo quanti nodi effettivamente posso cancellare
         }
@@ -510,12 +521,15 @@ void removeToDocument(long startIndex, long howMany){
         nodeInDocument -= howMany;
     }
 
+    // !!! non metto a NULL le ultime componenti per il semplice fatto che verranno sovrascritte in caso dai comandi successivi
+
+
     // salva lo stato dopo aver effetuato la remove
     tail_history->numRow = nodeInDocument;
     tail_history->cellAllocated = document.dim;
-    tail_history->prevState = (array_string_ptr ) calloc(document.dim, sizeof(string_ptr));
+    tail_history->savedState = (array_string_ptr ) calloc(document.dim, sizeof(string_ptr));
 
-    memcpy(tail_history->prevState, document.containers, document.dim * sizeof(string_ptr));
+    memcpy(tail_history->savedState, document.containers, document.dim * sizeof(string_ptr));
 
     tail_history->copy = true;
 
@@ -525,9 +539,9 @@ void removeToDocument(long startIndex, long howMany){
 void undoToDocument(long ret){
 
     bool stop = false;
-    for (int i = 0; i < ret && !stop; ++i) {         // svolgo le undo
+    for (int i = 0; i < ret && !stop; ++i) {         // svolgo le undo, torno indietro nella history di ret volte
 
-        if (tail_history->prev == NULL) {
+        if (tail_history->prev == NULL) {       // per debug, non ci dovrebbe mai entrare
             printf("HISTORY ERROR\n");
             stop = true;
         }
@@ -540,20 +554,18 @@ void undoToDocument(long ret){
         // in questo punto della hitstory è salvata una copia intera del document
         // quindi posso ripristinare subito lo stato
 
-        //document.containers = tail_history->prevState;    // ripristino la versione precendente alla delete
+        //document.containers = tail_history->savedState;    // ripristino la versione precendente
         document.dim = tail_history->cellAllocated;
         nodeInDocument = tail_history->numRow;
 
+        // modo giusto di ripristinare la versione precendente
         document.containers = (array_string_ptr ) calloc(tail_history->cellAllocated, sizeof(string_ptr));
-        memcpy(document.containers, tail_history->prevState, tail_history->cellAllocated * sizeof(string_ptr));
+        memcpy(document.containers, tail_history->savedState, tail_history->cellAllocated * sizeof(string_ptr));
 
     }
     else
     {
         // in questo punto della history non è stata salvata una copia ma solo le righe aggiunte
-        // basta tenere lo stato attuale e decrementare il numero di righe presenti in document
-
-        //nodeInDocument -= tail_history->numRow;
 
         restorePrevSavedState();
     }
@@ -562,9 +574,9 @@ void undoToDocument(long ret){
 void redoToDocument(long ret){
 
     bool stop = false;
-    for (int i = 0; i < ret && !stop; ++i) {
+    for (int i = 0; i < ret && !stop; ++i) {         // svolgo le redo, vado avanti nella history di ret volte
 
-        if (tail_history->next == NULL) {
+        if (tail_history->next == NULL) {       // per debug, non ci dovrebbe mai entrare
             printf("HISTORY ERROR\n");
             stop = true;
         }
@@ -577,18 +589,18 @@ void redoToDocument(long ret){
         // in questo punto della hitstory è salvata una copia intera del document
         // quindi posso ripristinare subito lo stato
 
-        //document.containers = tail_history->prevState;    // ripristino la versione precendente alla delete
+        //document.containers = tail_history->savedState;    // ripristino la versione successiva
         document.dim = tail_history->cellAllocated;
         nodeInDocument = tail_history->numRow;
 
+        // modo giusto di ripristinare la versione successiva
         document.containers = (array_string_ptr ) calloc(tail_history->cellAllocated, sizeof(string_ptr));
-        memcpy(document.containers, tail_history->prevState, tail_history->cellAllocated * sizeof(string_ptr));
+        memcpy(document.containers, tail_history->savedState, tail_history->cellAllocated * sizeof(string_ptr));
 
     }
     else
     {
         // in questo punto della history non è stata salvata una copia ma solo le righe aggiunte
-        // devo cercare lo stato successivo in cui è stata fatta una copia completa e ritornare allo stato richiesto
 
         restorePrevSavedState();
     }
@@ -606,7 +618,7 @@ void restorePrevSavedState() {
 
     // copia lo stato completo
     document.containers = (array_string_ptr ) calloc(iterator->cellAllocated, sizeof(string_ptr));
-    memcpy(document.containers, iterator->prevState, iterator->cellAllocated * sizeof(string_ptr));
+    memcpy(document.containers, iterator->savedState, iterator->cellAllocated * sizeof(string_ptr));
 
     document.dim = iterator->cellAllocated;
     nodeInDocument = iterator->numRow;
@@ -627,10 +639,10 @@ void restorePrevSavedState() {
 
         for (int i = 0; i < numRow; ++i) {
 
-            document.containers[startIndex+i] = iterator->prevState[i];
+            document.containers[startIndex+i] = iterator->savedState[i];     // applico le modifiche
         }
 
-        nodeInDocument += numRow;
+        nodeInDocument += numRow;       // incremento nodeInDocument del numero di nodi che sono andato ad aggiungere al documento
 
         iterator = iterator->next;
     }
@@ -642,19 +654,19 @@ void restorePrevSavedState() {
 // HELPER
 string_ptr getRow(){
 
-    string_ptr res = fgets(tmp, ROW_LEN, stdin);     // fgets gets '\n' at the end of the string
+    string_ptr res = fgets(tmp, ROW_LEN, stdin);     // !!! fgets mette '\n' alla fine della stringa
 
     if (res == NULL) {
         printf("Failed to read input.\n");
         return 0;
     }
 
-    unsigned long len = strlen(tmp);
+    unsigned long len = strlen(tmp);                // calcolo la reale lunghezza della stringa per poter allocare row
 
-    row = (string_ptr)malloc(sizeof(char) * len);
+    row = (string_ptr)malloc(sizeof(char) * len);   // alloco row della lunghezza che mi serve
 
-    strncpy(row, tmp, len);
-    strtok(row, "\n");
+    strncpy(row, tmp, len);     // copio tmp in row
+    strtok(row, "\n");     // taglio \n da row
 
     return row;
 }
@@ -662,8 +674,8 @@ void getBounds(string_ptr line, long *ind1, long *ind2){
 
     long ret;
 
-    ret = strtol(line, &line, 10);
-    line++;
+    ret = strtol(line, &line, 10);      // restituisce il primo numero che trova e lo rimuove dalla stringa
+    line++;                                   // mi sposto dopo la virgola
     *ind1 = ret;
     ret = strtol(line, &line, 10);
     *ind2 = ret;

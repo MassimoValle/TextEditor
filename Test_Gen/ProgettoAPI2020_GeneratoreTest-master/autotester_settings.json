@@ -1,0 +1,17 @@
+{
+    "source": "main.c",
+    "gccArgs": [
+        "-DEVAL",
+        "-std=gnu11",
+        "-O2",
+        "-pipe",
+        "-static",
+        "-s",
+        "-lm"
+    ],
+    "generatorArgs": [
+        "1024",
+        "1000",
+        "0"
+    ]
+}

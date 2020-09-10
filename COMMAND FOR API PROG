@@ -1,0 +1,38 @@
+// COMMAND FOR API PROG
+
+
+// COMPILE WITH CORRECT FLAG
+gcc main.c -g -o main
+g++ -std=c++11 main.c -g -o main
+
+
+// VALGRIND COMMANDS
+valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./main
+
+valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./main < public_tests_writeonly/Write_Only_1_input.txt
+
+valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./main < bulkreads_public_tests/Bulk_Reads_1_input.txt 
+
+valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./main < timeforachange_public_tests/Time_for_a_change_1_input.txt 
+
+valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./main < rollingback_public_tests/Rolling_Back_1_input.txt
+
+valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./main < alteringhistory_public_tests/Altering_History_1_input.txt
+
+valgrind --leak-check=full --show-leak-kinds=all --track-origins=yes ./main < rollercoaster_public_tests/Rollercoaster_1_input.txt
+
+
+// MASSIF
+valgrind --tool=massif --massif-out-file=output_file ./main
+massif_visualizer output_file
+ms_print output_file
+
+
+// CALLGRIND
+valgrind --tool=callgrind --dump-instr=yes --callgrind-out-file=callgrind.out ./main
+kcachegrind callgrind.out
+
+
+
+// LUANCH DOCKER AND SHARE PROJECT
+docker run -it -v ~/ICT/Programming/C-C++/CLion/API-2020:/API_prog ef7a6740c75c
